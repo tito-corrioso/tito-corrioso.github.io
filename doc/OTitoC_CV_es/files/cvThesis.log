@@ -1,0 +1,503 @@
+This is pdfTeX, Version 3.14159265-2.6-1.40.15 (MiKTeX 2.9 64-bit) (preloaded format=pdflatex 2017.9.23)  19 JUL 2018 23:12
+entering extended mode
+**cvThesis.tex
+(cvThesis.tex
+LaTeX2e <2015/01/01>
+Babel <3.9l> and hyphenation patterns for 69 languages loaded.
+! Undefined control sequence.
+l.2 \section
+            {{Tesis}}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+
+! LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.2 \section{{T
+               esis}}
+You're in trouble here.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+Missing character: There is no T in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no s in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no s in font nullfont!
+
+Overfull \hbox (20.0pt too wide) in paragraph at lines 2--3
+[] 
+ []
+
+
+! LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.4 \begin{tabular}
+                   {p{3cm}p{.75\linewidth}}
+You're in trouble here.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 4.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 4.
+
+LaTeX Font Warning: Font shape `OT1/cmr/bx/sc' undefined
+(Font)              using `OT1/cmr/bx/n' instead on input line 5.
+
+Missing character: There is no T in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no b in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no j in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no d in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no D in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no p in font nullfont!
+Missing character: There is no l in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no m in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no U in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no v in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no s in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no d in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no d in font nullfont!
+Missing character: There is no d in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no O in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no t in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no C in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no b in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no T in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no t in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no : in font nullfont!
+Missing character: There is no I in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no g in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no L in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no c in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no F in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no k in font nullfont!
+Missing character: There is no S in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no b in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no M in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no c in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no s in font nullfont!
+Missing character: There is no . in font nullfont!
+
+Overfull \hbox (5.00002pt too wide) in paragraph at lines 5--8
+[]$\OML/cmm/m/it/10 .$
+ []
+
+
+Overfull \hbox (20.75543pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 ``Im-
+ []
+
+
+Overfull \hbox (15.84433pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 ple-
+ []
+
+
+Overfull \hbox (45.23305pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 mentacion
+ []
+
+
+Overfull \hbox (9.71104pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 de
+ []
+
+
+Overfull \hbox (13.311pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 Al-
+ []
+
+
+Overfull \hbox (13.28879pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 go-
+ []
+
+
+Overfull \hbox (14.18321pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 rit-
+ []
+
+
+Overfull \hbox (17.37769pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 mos
+ []
+
+
+Overfull \hbox (9.71104pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 de
+ []
+
+
+Overfull \hbox (15.72766pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 Fil-
+ []
+
+
+Overfull \hbox (16.22765pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 tros
+ []
+
+
+Overfull \hbox (9.71104pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 de
+ []
+
+
+Overfull \hbox (49.36636pt too wide) in paragraph at lines 5--8
+\OT1/cmr/m/it/10 Partculas''
+ []
+
+
+Overfull \hbox (105.35826pt too wide) in paragraph at lines 4--9
+[][] 
+ []
+
+! Undefined control sequence.
+l.10 \section
+             {\textsc{Tesis Tutoreadas}}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+
+! LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.10 \section{\textsc{Tesis Tutoreadas}
+                                       }
+You're in trouble here.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+
+Overfull \hbox (45.6165pt too wide) in paragraph at lines 10--11
+[]\OT1/cmr/m/sc/10 Tesis
+ []
+
+
+Overfull \hbox (17.7721pt too wide) in paragraph at lines 10--11
+\OT1/cmr/m/sc/10 Tu-
+ []
+
+
+Overfull \hbox (27.64429pt too wide) in paragraph at lines 10--11
+\OT1/cmr/m/sc/10 tore-
+ []
+
+
+Overfull \hbox (22.8666pt too wide) in paragraph at lines 10--11
+\OT1/cmr/m/sc/10 adas 
+ []
+
+
+! LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 \begin{tabular}
+                    {p{3cm}p{.75\linewidth}}
+You're in trouble here.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+Missing character: There is no T in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no b in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no j in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no d in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no D in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no p in font nullfont!
+Missing character: There is no l in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no m in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no U in font nullfont!
+Missing character: There is no O in font nullfont!
+Missing character: There is no , in font nullfont!
+Missing character: There is no C in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no b in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no A in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no t in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no : in font nullfont!
+Missing character: There is no B in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no o in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no c in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no A in font nullfont!
+Missing character: There is no g in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no l in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no L in font nullfont!
+Missing character: There is no e in font nullfont!
+LaTeX Font Info:    Try loading font information for +cmr on input line 13.
+LaTeX Font Info:    No file cmr.fd. on input line 13.
+
+LaTeX Font Warning: Font shape `/cmr/m/n' undefined
+(Font)              using `/cmr/m/n' instead on input line 13.
+
+! Corrupted NFSS tables.
+wrong@fontshape ...message {Corrupted NFSS tables}
+                                                  error@fontshape else let f...
+l.13 ..., UO, Cuba. Autora: Beronica Aguilar Le\'o
+                                                  n.  Lic. en Matem\'atica (...
+This error message was generated by an \errmessage
+command, so I can't give any explicit help.
+Pretend that you're Hercule Poirot: Examine all clues,
+and deduce the truth by order and method.
+
+
+LaTeX Font Warning: Font shape `/cmr/m/n' undefined
+(Font)              using `OT1/cmr/m/n' instead on input line 13.
+
+Missing character: There is no n in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no L in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no c in font nullfont!
+Missing character: There is no . in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no n in font nullfont!
+Missing character: There is no M in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no t in font nullfont!
+Missing character: There is no e in font nullfont!
+Missing character: There is no m in font nullfont!
+Missing character: There is no t in font nullfont!
+Missing character: There is no i in font nullfont!
+Missing character: There is no c in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no ( in font nullfont!
+Missing character: There is no P in font nullfont!
+Missing character: There is no u in font nullfont!
+Missing character: There is no r in font nullfont!
+Missing character: There is no a in font nullfont!
+Missing character: There is no ) in font nullfont!
+Missing character: There is no . in font nullfont!
+
+Overfull \hbox (5.00002pt too wide) in paragraph at lines 13--16
+[]$\OML/cmm/m/it/10 .$
+ []
+
+
+Overfull \hbox (19.45544pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 ``So-
+ []
+
+
+Overfull \hbox (12.90543pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 bre
+ []
+
+
+Overfull \hbox (11.24437pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 al-
+ []
+
+
+Overfull \hbox (24.78874pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 gunos
+ []
+
+
+Overfull \hbox (21.46652pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 mod-
+ []
+
+
+Overfull \hbox (8.1777pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 e-
+ []
+
+
+Overfull \hbox (11.7555pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 los
+ []
+
+
+Overfull \hbox (9.71104pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 de
+ []
+
+
+Overfull \hbox (7.66663pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 la
+ []
+
+
+Overfull \hbox (41.79417pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 Dinamica
+ []
+
+
+Overfull \hbox (9.71104pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 de
+ []
+
+
+Overfull \hbox (18.2832pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 Dis-
+ []
+
+
+Overfull \hbox (31.30534pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 persion
+ []
+
+
+Overfull \hbox (12.26659pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 del
+ []
+
+
+Overfull \hbox (32.33865pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 Dengue
+ []
+
+
+Overfull \hbox (16.35544pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 me-
+ []
+
+
+Overfull \hbox (11.75548pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 di-
+ []
+
+
+Overfull \hbox (18.65543pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 ante
+ []
+
+
+Overfull \hbox (25.43872pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 Ecua-
+ []
+
+
+Overfull \hbox (27.08871pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 ciones
+ []
+
+
+Overfull \hbox (26.07758pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 Difer-
+ []
+
+
+Overfull \hbox (13.7999pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 en-
+ []
+
+
+Overfull \hbox (29.16649pt too wide) in paragraph at lines 13--16
+\OT1/cmr/m/it/10 ciales''
+ []
+
+
+Overfull \hbox (10.00003pt too wide) in paragraph at lines 13--16
+\/cmr/m/n/10 o
+ []
+
+
+Overfull \hbox (5.00002pt too wide) in paragraph at lines 13--16
+\/cmr/m/n/10 a
+ []
+
+)
+! Emergency stop.
+<*> cvThesis.tex
+                
+*** (job aborted, no legal \end found)
+
+ 
+Here is how much of TeX's memory you used:
+ 28 strings out of 493671
+ 300 string characters out of 3143859
+ 53427 words of memory out of 3000000
+ 3471 multiletter control sequences out of 15000+200000
+ 4595 words of font info for 17 fonts, out of 3000000 for 9000
+ 1025 hyphenation exceptions out of 8191
+ 19i,9n,16p,305b,198s stack positions out of 5000i,500n,10000p,200000b,50000s
+!  ==> Fatal error occurred, no output PDF file produced!

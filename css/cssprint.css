@@ -1,0 +1,109 @@
+@charset "utf-8";
+/* CSS Document */
+/* Create by Osmani Tito-Corrioso */
+
+@page:first {
+  margin-top: 1cm;
+  margin-bottom: 2cm;
+}
+
+@page {
+  margin-top: 2cm;
+  margin-bottom: 2cm;
+}
+
+a.ccoathor {
+	color: black !important;
+	text-decoration: none !important;
+	font-weight: normal !important;
+}
+
+body {
+	background: #FFFFFF !important;
+}
+
+/* CONTAINER */
+
+#icontainer {
+	width: 100% !important;
+}
+
+/* HEADER */
+
+#ihcont, #iwebsite, #divflag { /* Container of the header + navegation top*/
+	display: none !important;
+}
+
+#iheader0 {
+	overflow: hidden !important;
+	position: static !important;
+	border-right: 0px solid white !important;
+}
+
+#iheader1 {
+	background: white !important;
+}
+
+#ititle {
+	overflow: visible !important;
+	position: fixed !important;
+	display: block !important;
+	width: 100% !important;
+	text-align: left !important;
+	margin-top: 0em !important;
+}
+
+div.ctitle span em {
+	padding-bottom: 2em !important;
+}
+
+#iotctitle em {
+	font-size: 2.1em !important;
+}
+
+#iotcimage {
+	float: right !important;
+}
+
+/* NAVEGATION top */
+
+#inavtop1, #iulnav, #iulnav li, #iulnav li a, #iulnav li a:visited {
+	display: none !important;
+}
+
+/* NAVEGATION left */
+
+#inavleft {
+	background-color: white !important;
+	border-right: 0em solid #FFFFFF !important;
+	border-top: 1px solid black !important;
+	min-height: 0em !important;
+}
+
+#inavleft:hover {
+	background-color: white !important;
+}
+
+/* CONTENTS */
+
+#icontents {
+	border-bottom: 0px solid white !important;
+	border-top: 1px solid black !important;
+	background-color: white !important;
+	float:right !important;
+	border-right: 0em solid white !important;
+	min-height: 0em !important;
+}
+
+#icontents:hover {
+	background-color: white !important;
+}
+
+
+#ibeginning, #ireturn {
+	display: none !important;
+}
+
+#ifooter7, #ifooter6, #ifooter5, #ifooter4, #ifooter3, #ifooter2, #ifooter1 {
+	display: none !important;
+}
