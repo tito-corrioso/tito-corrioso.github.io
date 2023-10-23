@@ -1,0 +1,331 @@
+@charset "utf-8";
+/* CSS Document */
+/* Create by Osmani Tito-Corrioso */
+
+* {
+	overflow: auto;
+    margin: 0;
+    padding: 0;
+	border: 0;
+	float: none;
+}
+
+a {
+	color: blue;
+	font-weight: bold;
+}
+
+a:hover, a:active {
+	color: red;
+}
+
+a:visited {
+	color: red;
+	font-weight: bold;
+}
+
+body {
+	overflow: visible;
+	text-align: center;
+	font-size: 10pt;
+    font-family: Verdana, Arial, sans-serif;
+	background: #000000 url(../img/mybackk.png) repeat center;
+	background-attachment: fixed;
+}
+
+/* CONTAINER */
+
+#icontainer {
+	overflow: visible;
+	text-align: left;
+	width: 70em; /*It is more that the sum of #icontents(padding-left + right + width) and #inavleft(width)*/
+	margin: 0 auto;
+}
+
+/* HEADER */
+
+#ihcont { /* Container of the header + navegation top*/
+	overflow: visible;
+	width: 100%;
+	height: 11.5em;
+}
+
+#iheader0 {
+	overflow: visible;
+	width: 69.35em; /*It is quasi equal to the width of the CONTAINER*/
+	position: fixed;
+	border-right: 1px solid #000000;
+}
+
+#iheader1 {
+	width:100%;
+	/*background-color: rgb(232, 236, 45);*/
+	background: rgb(232, 236, 45) url(../img/myheader.png) repeat-x top left;
+}
+
+#ititle {
+	text-align: center;
+	margin-top: 0.5em;
+}
+
+#iotctitle em {
+	font-size: 3.5em;
+	font-weight: bold;
+	font-family: 'Times New Roman', serif; 
+}
+
+#iwebsite {
+	font-size: 1em;
+	text-decoration: underline;
+}
+
+#iotcimage {
+	width: 10em;
+	height: 10em;
+	float: left;
+}
+
+#divflag {
+	text-align: right;	
+}
+
+.flagflag {
+	width: 3em;
+	height: 2em;
+}
+
+/* NAVEGATION top */
+
+#inavtop1 {
+	width:100%;
+	overflow: hidden;
+	background-color: rgb(170, 210, 240);
+	padding-top: 0em;
+	padding-bottom: 0em;
+	height: 1.65em;
+	border-right: 1px solid #000000;
+}
+
+#iulnav {
+	clear: both;
+	float: left;
+	text-align: left;
+	list-style: none;
+	padding-top: 0;
+	margin: 0;
+	border-left: 1px solid #000000;
+	border-bottom: 1px solid rgba(240, 240, 240,0.85);
+}
+
+#iulnav li {
+	float: left; /*a key*/
+	display: inline-block;
+	list-style: none;
+	padding-right: 0; /*other key, modify the element 'a', no the element 'li'*/
+	font: bold 1em;
+}
+
+#iulnav li:hover, #iulnav li:active {
+	background-color: rgb(170, 210, 240);
+}
+
+#iulnav li a, #iulnav li a:visited {
+	background: rgb(170, 210, 240);
+}
+
+#iulnav li a, #iulnav li a:visited, #iulnav li a:hover, #iulnav li a:active {
+	color: black;
+	text-decoration: none;
+	font-weight: bold;
+	display: block;
+	padding-right: 0.33em;
+	padding-left: 0.33em;
+	padding-top: 0.1em;
+	padding-bottom: 0.1em;
+	border-right: 0.1em solid black;
+}
+
+#iulnav li a, #iulnav li a:visited {
+	border-top: 1px solid black;
+	border-bottom: 1px solid black;
+}
+
+#iulnav li a:hover, #iulnav li a:active {
+	background-color: rgb(232, 236, 45);
+	border-top: 1px solid rgb(232, 236, 45);
+	border-bottom: 1px solid rgb(232, 236, 45);
+}
+
+a.ctopes { /* for spanish */
+	font-size: 0.9em;
+}
+
+#iulnav li a.ctopes, #iulnav li a.ctopes:visited, #iulnav li a.ctopes:hover, #iulnav li a.ctopes:active {
+	padding-bottom: 0.2em;
+	padding-right: 0.5em;
+}
+
+/* NAVEGATION left */
+
+#inavleft {
+	overflow: visible;
+	padding-bottom: 0.6em;
+	padding-left: 0.95em;
+	padding-right: 0.95em;
+	padding-top: 1.5em;
+	width: 23.57%;
+	min-height:70em;
+	background-color: rgba(240, 240, 240,0.95);
+	border-right: 0.04em solid #000000;
+	margin: 0 auto;
+	float: left;
+}
+
+#inavleft:hover, #inavleft:active {
+	background-color: rgba(240, 240, 240,1);
+}
+
+#inavleft ul li {
+	margin-top: 0.1em;
+	padding-top: 0.1em;
+}
+
+#inavleft ul.cliaweb li:hover, #inavleft ul.cliaweb li:active {
+	overflow: visible;
+	height: 1.5em;
+	display: block;
+	border-bottom: 1px solid black;
+	border-top: 1px solid black;
+}
+
+a.cweb {
+	color: blue;
+	text-decoration: none;
+	display: block;
+}
+
+a.cweb:hover, a.cweb:visited, a.cweb:active {
+	color: red;
+	display: block;
+}
+
+#inavleft span {
+	border-bottom: 1px solid #000000;
+	display: block;
+	font-weight: bold;
+}
+
+#inavleft ul li span {
+	border: 0;
+	display: block;
+	font-weight: bold;
+	color: rgb(181, 4, 17);
+}
+
+div.cfar { /* Separator */
+	width: 100%;
+	height:0.8em;
+}
+
+/* CONTENTS */
+
+#icontents {
+	overflow: visible;
+	text-align: justify;
+	line-height: 1.5em;
+	padding-bottom: 1em;
+	padding-left: 1.5em;
+	padding-right: 1em;
+	padding-top: 1em;
+	width:69.07%;
+	min-height: 70em;
+	border-bottom: 1px solid black;
+	background-color: rgba(240, 240, 240,0.95);
+	margin:0 auto;
+	float:left;
+	border-right: 0.1em solid #000000;
+}
+
+#icontents:hover, #icontents:active {
+	background-color: rgba(240, 240, 240,1);
+}
+
+div.ccontents p, div.ccontents table, div.ccontents span {
+	margin-right: 2em;
+	overflow: visible;
+}
+
+div.ccontents p.cfl:first-letter {
+	font-size: 2.5em;
+	font-weight: bold;
+	line-height: 1em;
+	float: left;
+	margin: 0em;
+}
+
+div.ccontents p {
+	font-size: 1.2em;
+}
+
+div.ccontents .cconttitle {
+	display: block;
+	overflow: visible;
+	padding-bottom: 0.5em;
+	padding-left: 0.5em;
+	padding-right: 0em;
+	padding-top: 0.5em;
+	margin-top: 0.5em;
+	margin-right: 1.2em;
+	background-color: rgb(170, 210, 240);
+}
+
+div.ccontents table {
+	border-spacing: 0em 1em;
+	margin-top: 1em;
+	empty-cells: hide;
+	font-size: 1.2em;
+}
+
+div.ccontents table tr td {
+	vertical-align: top;
+	min-width: 6.5em;
+}
+
+#ibeginning {
+	width:100%;
+}
+
+#ireturn {
+	margin-top: 1em;
+	text-align: center;
+	background-color: rgb(232, 236, 45);
+	overflow: visible;
+	padding: 0em;
+	margin-right: 1.8em;
+}
+
+#iareturn {
+	display: block;
+	padding-bottom: 0.5em;
+	padding-left: 0.5em;
+	padding-top: 0.5em;
+	padding-right: 0em;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+#iareturn:visited {
+	color: blue;
+	font-weight: bold;
+}
+
+#iareturn:hover, #iareturn:active {
+	color: black;
+	background-color: rgb(170, 210, 240);
+}
+
+#ifooter {
+	clear:both;
+	width:100%;
+}
+

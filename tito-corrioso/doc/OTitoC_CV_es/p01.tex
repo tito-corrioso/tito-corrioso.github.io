@@ -1,0 +1,155 @@
+\documentclass[12pt,spanish,letterpaper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[latin1]{inputenc}
+\usepackage{palatino}
+\usepackage{ae}
+\usepackage[spanish]{babel}
+\usepackage{xparse}
+\usepackage{latexsym}
+\usepackage{verbatim}
+\usepackage{moreverb}
+\usepackage{color}
+\usepackage{babel}
+\usepackage{setspace}%--->\doublespace ---> para interlineado 1,5
+%\usepackage{newcent}
+\usepackage[dvips]{graphicx}
+\usepackage{epsfig}
+\usepackage{epsf}
+\usepackage{multicol}
+\usepackage{indentfirst}
+%\setlength{\parindent}{8pt}  %---> para el tamaño del margen de la primera palabra del parrafo
+\usepackage{amsthm}
+\usepackage{anysize}
+%\usepackage{float}%%%%=== Se usa ahora [H] en vez de [h!], aunque se pede seguir usando este ultimo.
+%\usepackage{pslatex}%---> Tipo de letra Times New Roman
+
+\marginsize{2cm}{2cm}{2cm}{2cm}
+\renewcommand{\baselinestretch}{1.2}
+\setlength{\parindent}{.5cm}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%---INICIO DE ENCABEZADO FANCY---%%%%%%%%%%%%%%%%%%%%%%%%
+%\usepackage{fancybox}
+%\usepackage{helvet}
+%\newcommand{\helv}{\fontfamily{phv}\fontsize{9}{11}\selectfont}
+%\usepackage{fancyhdr}
+%\pagestyle{fancy}
+%% Definir las marcas: capítulo. sección -------
+%%\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+%\renewcommand{\sectionmark}[1]{\markright{Osmani Tito Corrioso: Sistema de Torneo GPA}}
+%\renewcommand{\subsectionmark}[1]{\markright{Osmani Tito Corrioso: Sistema de Torneo GPA}}
+%\renewcommand{\footnotemark}[1]{\markright{EduSol}}
+%\fancyhf{} % borra cabecera y pie actuales
+%% El número de página
+%\fancyhead[LE,RO]{\helv\thepage} %L=Left, R=right, O=Odd ( impar) , E=Even págs pares
+%% "Marcas" a la derecha e izquierda del encabezado
+%\fancyhead[LO]{\helv\rightmark}
+%\fancyhead[RE]{\helv\leftmark}
+%\fancyfoot[CE,CO]{\helv EduSol}
+%%\fancyfoot[LO]{\helv\rightmark}
+%%\fancyfoot[RE]{\helv\leftmark}
+%\renewcommand{\headrulewidth}{1pt} % Sin raya. Con raya?: cambiar {0} por {0.5pt}
+%\renewcommand{\footrulewidth}{1pt}
+%\addtolength{\headheight}{0.5pt} % espacio para la raya
+%%\fancypagestyle{plain}{ %
+%%\fancyhead{} % elimina cabeceras y raya en páginas "plain"
+%%\renewcommand{\headrulewidth}{0pt}}
+%%%%%%%%%%%%%%%%%%%%%%%%%---END---%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+%\usepackage{algorithm}
+%\usepackage{algorithmic}
+%\usepackage{rotating} %--->se utiliza para rotar las tablas o el texto de una celda, implica \begin{sideways}...\end{sideways}
+\usepackage{booktabs} %--->se utiliza para aumentar los espacios verticales y horizontales de las columnas de las tablas, por ejemplo, con el codigo: @{\vrule height 13pt depth 0pt width 0pt} en una de las columnas es suficiente para el alto de todas las columnas, asi como regular el ancho
+%--->
+%--->\parbox{4in}{texto} este es otro codigo importante para que las oraciones se coloquen en columnas en una tabla
+\usepackage{hyperref}
+%\usepackage[dvipdfm]{hyperref}%--- probar con dvipdfmx y backref=true
+%\hypersetup{bookmarks,colorlinks=true,linkcolor=blue,citecolor=red} %---utilizar black para imprimir
+%\hypersetup{bookmarks,colorlinks=true,linkcolor=black,citecolor=black} %---utilizar black para imprimir
+%\usepackage[hypertex]{hyperref} 
+
+%\theoremstyle{definition}
+%\theoremstyle{theorem}
+%\renewcommand{\refname}{Bibliograf\'{\i}a}
+%\renewcommand{\contentsname}{\'{I}ndice}
+%\renewcommand{\tablename}{Tabla}
+%\AtBeginDocument{\renewcommand\tablename{Tabla}}
+%\renewcommand{\figurename}{Figura}
+%\renewcommand{\refname}{Bibliograf\'{\i}a}
+%\renewcommand{\bibname}{Bibliograf\'{\i}a}
+
+%\renewcommand{\contentsname}{\textsc{\'Indice general}} %-----Se colocan dentro de \begin{document}
+%\renewcommand{\listfigurename}{\textsc{\'Indice de figuras}} %-----Se colocan dentro de \begin{document}
+%\makeatletter\renewcommand{\ALG@name}{Algoritmo} %-----Se colocan dentro de \begin{document}
+
+%%%---la revision del idioma se le puede cambiar en \Project\Propierties\es
+%\NewDocumentCommand{\nombre}{}{codigo con #1, #2, ...}
+%\newcommand{\dr}{ esdedf\textbf{bvfdbgfgb} } %---este es un ejemplo de comando utilizado para simplificar
+%\newtheorem{identificador}[contador]{nombre del teorema}[section]
+%\newtheorem{teor}{Teorema}[section] %--->este es un ejemplo
+%\theoremstyle{definition}
+
+%\addtolength{\textwidth}{0cm}
+%\addtolength{\textheight}{0cm}
+%\oddsidemargin 1.0cm
+%\setlength{\textwidth}{15.59cm}
+%\topmargin -1cm
+%\setlength{\textheight}{24.94cm}
+
+\frenchspacing
+%\pagestyle{headings}
+\pagestyle{myheadings}
+\markright{\textsc{Curriculum Vitae 2023}\hspace*{8.5cm}{O. Tito-Corrioso}}
+
+%--------------------------------------------------------
+%\thispagestyle{plain}
+%\begin{center}
+%
+%\includegraphics[width=3cm,height=3cm]{sello1.eps}
+%\\\vspace*{0.2cm}
+%{\Large \bf \textsc{Asignatura Optativa III (Criptograf\'ia)}}\\
+%\vspace*{0.2cm}
+%{\Large \bf \textsc{Trabajo Extra Clase}}\\
+%\vspace*{0.3cm}
+%{\bf Osmani Tito Corrioso}\\
+%
+%\vspace*{0.3cm}
+%Departamento de Matem\'atica\\
+%
+%Facultad de Ciencias Naturales y Exactas\\
+%
+%Universidad de Oriente\\
+%\vspace*{0.3cm}
+%\today
+%
+%\end{center}
+%----------------------------------------------------
+%\title{\bf{Asignatura Optativa I\\
+%Teor\'ia de N\'umeros y Criptograf\'ia}}
+%\author{{\bf Osmani Tito Corrioso}\\[0.3cm]
+%{\small{\bf Lic. en Matem\'atica, 3er A\~no, Universidad de Oriente}}}
+%\date{{\bf Junio de 2016}}
+%
+%\maketitle
+
+%\setcounter{secnumdepth}{-1}
+%\setcounter{secnumdepth}{6}
+%\pagenumbering{roman}
+%\pagenumbering{arabic}
+
+%\DeclareGraphicsExtensions{.jpg,.pdf,.png,.eps}
+%\includegraphics[width=7cm,height=6cm]{figura1.eps}
+
+%\bibliographystyle{ESTILO}%los estilos pueden ser: plain, apalike, alpha, abbrv, unsrt
+%\bibliography{basededatos1[,basededatos2,...]}
+%%--para las citas se tiene:  \nocite{Llave},  \nocite{*}
+
+%\begin{thebibliography}{99}
+%\addcontentsline{toc}{section}{Referencia}
+%\bibitem[DK07]{} Delfs, Hans and Knebl, Helmut (20017). \textit{Introduction to Cryptografy: Principles and Applications}. Information Security and Cryptography Texts and Monographs. Second Edition. Springer. Library of Congress Control Number: 2007921676. ISSN 1619-7100. ISBN-13 978-3-540-49243-6.
+%\end{thebibliography}
+
