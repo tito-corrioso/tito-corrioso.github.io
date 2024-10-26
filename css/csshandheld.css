@@ -1,7 +1,7 @@
 @charset "utf-8";
 /* CSS Document */
 /* Create by Osmani Tito-Corrioso */
-@media handheld {
+
 * {
 	overflow: auto;
     margin: 0;
@@ -287,6 +287,4 @@ div.ccontents table tr td {
 #ifooter {
 	clear:both;
 	width:100%;
-}
-
 }
