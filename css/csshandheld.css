@@ -29,7 +29,7 @@ body {
 	text-align: center;
 	font-size: 1em !important;
     font-family: Verdana, Arial, sans-serif;
-	background: #000000 url(../img/mybackk.png) repeat center;
+	background: #FFFFFF; /*#000000 url(../img/mybackk.png) repeat center;*/
 	background-attachment: fixed;
 }
 
