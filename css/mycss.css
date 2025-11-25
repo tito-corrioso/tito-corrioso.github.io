@@ -60,7 +60,7 @@ body {
 #iheader1 {
 	width:100%;
 	/*background-color: rgb(232, 236, 45);repeat-x top left;*/
-	background: rgb(232, 236, 45) url(../img/portada-2.png); 
+	background: rgb(0, 0, 0) url(../img/portada-2.png); 
 }
 
 #ititle {
@@ -330,5 +330,6 @@ div.ccontents table tr td {
 	clear:both;
 	width:100%;
 }
+
 
 
