@@ -430,11 +430,16 @@
     const style = document.createElement('style');
     style.id = 'cv-pdf-styles';
     style.textContent = `
-      /* ============ CONTENIDO DEL PDF ============ */
-     .cv-root,
+      #cv-pdf-mount,
+#cv-pdf-mount *,
+.cv-root,
 .cv-root * {
   overflow: visible !important;
   float: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  animation: none !important;
+  transition: none !important;
 }
       .cv-root {
         font-family: 'Inter', Arial, Helvetica, sans-serif;
