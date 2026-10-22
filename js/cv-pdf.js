@@ -23,7 +23,7 @@
     cvLabel: 'Curriculum Vitae',
     photo: 'img/otc.jpg',
     qr: 'img/QR.jpg',
-    website: 'https://osmanitito.github.io/',
+    website: 'https://tito-corrioso.github.io/',
     // Orden de secciones en el PDF (papers y congress al final, según pedido)
     sections: [
       { key: 'education', file: 'education.html', titleEn: 'Education',            titleEs: 'Educación',               translate: true  },
