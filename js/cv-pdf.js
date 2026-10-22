@@ -569,132 +569,144 @@
   // ==========================================================================
   // GENERACIÓN DEL PDF
   // ==========================================================================
+
   async function generatePdf(lang, onProgress) {
-    const isEs = lang === 'es';
+  const isEs = lang === 'es';
+  await loadPdfLibraries();
 
-    // 1. Cargar librerías
-    await loadPdfLibraries();
+  // 1. Imágenes
+  let photoDataURL = null, qrDataURL = null;
+  try { photoDataURL = await makeCircularPhoto(getAbsoluteUrl(CONFIG.photo)); }
+  catch (e) { console.warn('[cv-pdf] Foto no cargada:', e.message); }
+  try { qrDataURL = await loadImageAsDataURL(getAbsoluteUrl(CONFIG.qr)); }
+  catch (e) { console.warn('[cv-pdf] QR no cargado:', e.message); }
 
-    // 2. Cargar imágenes (resolviendo rutas absolutas → funciona desde cualquier página)
-    let photoDataURL = null;
-    let qrDataURL = null;
-    try { photoDataURL = await makeCircularPhoto(getAbsoluteUrl(CONFIG.photo)); }
-    catch (e) { console.warn('[cv-pdf] Foto no cargada:', e.message); }
-    try { qrDataURL = await loadImageAsDataURL(getAbsoluteUrl(CONFIG.qr)); }
-    catch (e) { console.warn('[cv-pdf] QR no cargado:', e.message); }
-
-    // 3. Datos del index (perfil + sidebar)
-    let profile, sidebar;
-    if (document.querySelector('.about-text') && document.querySelector('aside .card')) {
-      profile = extractProfileFromDoc(document, lang);
-      sidebar = extractSidebarFromDoc(document, lang);
-    } else {
-      try {
-        const idxDoc = await fetchIndexDoc();
-        profile = extractProfileFromDoc(idxDoc, lang);
-        sidebar = extractSidebarFromDoc(idxDoc, lang);
-      } catch {
-        profile = [];
-        sidebar = [];
-      }
-    }
-
-    // 4. Construir contenido del PDF
-    const content = [];
-    content.push(buildHeaderPdf(lang, photoDataURL, qrDataURL));
-    content.push(...buildProfilePdf(profile, lang));
-    content.push(...buildSidebarPdf(sidebar, lang));
-
-    // 5. Procesar secciones (fetch → translate → build)
-    const totalSections = CONFIG.sections.length;
-
-    for (let i = 0; i < totalSections; i++) {
-      const s = CONFIG.sections[i];
-
-      if (onProgress) onProgress({
-        phase: 'fetch',
-        current: i + 1,
-        total: totalSections,
-        label: isEs ? s.titleEs : s.titleEn
-      });
-
-      let doc;
-      try {
-        doc = await fetchDoc(s.file);
-      } catch (err) {
-        console.warn('[cv-pdf] Error cargando ' + s.file + ':', err.message);
-        continue;
-      }
-
-      const entries = parseEntries(doc);
-      if (!entries.length) continue;
-
-      // Preparar DOM traducido por entrada
-      const translatedEntries = [];
-      for (const entry of entries) {
-        const temp = document.createElement('div');
-        temp.innerHTML = entry.html;
-        if (isEs && s.translate) {
-          await translateContainer(temp, lang, (done, total) => {
-            if (onProgress) onProgress({ phase: 'translate', current: done, total });
-          });
-        }
-        translatedEntries.push({
-          year: entry.year,
-          dom: temp,
-          sectionGroup: entry.sectionGroup
-        });
-      }
-
-      const sectionContent = buildSectionPdf(s, translatedEntries, lang);
-      if (sectionContent) content.push(...sectionContent);
-    }
-
-    // 6. Definición final del documento
-    const docDef = {
-      pageSize: 'A4',
-      pageMargins: [15, 20, 15, 22],
-      content,
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 10,
-        color: '#1e293b'
-      },
-      footer: function (currentPage, pageCount) {
-        return {
-          columns: [
-            {
-              text: CONFIG.website,
-              link: CONFIG.website,
-              alignment: 'left',
-              fontSize: 8,
-              color: '#64748b'
-            },
-            {
-              text: currentPage + ' / ' + pageCount,
-              alignment: 'right',
-              fontSize: 8,
-              color: '#64748b'
-            }
-          ],
-          margin: [15, 0, 15, 10]
-        };
-      }
-    };
-
-    // 7. Generar y descargar
-    const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
-    return new Promise((resolve, reject) => {
-      try {
-        window.pdfMake.createPdf(docDef).download(filename, () => {
-          console.log('[cv-pdf] ✓ PDF generado:', filename);
-          resolve();
-        });
-      } catch (e) {
-        reject(e);
-      }
-    });
+  // 2. Perfil + sidebar
+  let profile, sidebar;
+  if (document.querySelector('.about-text') && document.querySelector('aside .card')) {
+    profile = extractProfileFromDoc(document, lang);
+    sidebar = extractSidebarFromDoc(document, lang);
+  } else {
+    try {
+      const idxDoc = await fetchIndexDoc();
+      profile = extractProfileFromDoc(idxDoc, lang);
+      sidebar = extractSidebarFromDoc(idxDoc, lang);
+    } catch { profile = []; sidebar = []; }
   }
+
+  // 3. Contenido
+  const content = [];
+  content.push(buildHeaderPdf(lang, photoDataURL, qrDataURL));
+  content.push(...buildProfilePdf(profile, lang));
+  content.push(...buildSidebarPdf(sidebar, lang));
+
+  // 4. Secciones
+  const totalSections = CONFIG.sections.length;
+  for (let i = 0; i < totalSections; i++) {
+    const s = CONFIG.sections[i];
+
+    if (onProgress) onProgress({
+      phase: 'fetch', current: i + 1, total: totalSections,
+      label: (isEs ? s.titleEs : s.titleEn)
+    });
+
+    console.time('[cv-pdf] ' + s.key + ' fetch');
+    let doc;
+    try { doc = await fetchDoc(s.file); }
+    catch (err) { console.warn('[cv-pdf] Error ' + s.file + ':', err.message); console.timeEnd('[cv-pdf] ' + s.key + ' fetch'); continue; }
+    console.timeEnd('[cv-pdf] ' + s.key + ' fetch');
+
+    const entries = parseEntries(doc);
+    if (!entries.length) continue;
+
+    console.time('[cv-pdf] ' + s.key + ' translate+build');
+    const translatedEntries = [];
+    for (let j = 0; j < entries.length; j++) {
+      const entry = entries[j];
+      const temp = document.createElement('div');
+      temp.innerHTML = entry.html;
+      if (isEs && s.translate) {
+        try { await translateContainer(temp, lang, (d, t) => {
+          if (onProgress) onProgress({ phase: 'translate', current: d, total: t });
+        }); }
+        catch (e) { console.warn('[cv-pdf] Error traduciendo ' + s.key + '/' + j + ':', e.message); }
+      }
+      translatedEntries.push({ year: entry.year, dom: temp, sectionGroup: entry.sectionGroup });
+    }
+
+    const sectionContent = buildSectionPdf(s, translatedEntries, lang);
+    if (sectionContent) content.push(...sectionContent);
+    console.timeEnd('[cv-pdf] ' + s.key + ' translate+build');
+  }
+
+  // 5. Documento
+  const docDef = {
+    pageSize: 'A4',
+    pageMargins: [15, 20, 15, 22],
+    content,
+    defaultStyle: { font: 'Roboto', fontSize: 10, color: '#1e293b' },
+    footer: function (currentPage, pageCount) {
+      return {
+        columns: [
+          { text: CONFIG.website, link: CONFIG.website, alignment: 'left', fontSize: 8, color: '#64748b' },
+          { text: currentPage + ' / ' + pageCount, alignment: 'right', fontSize: 8, color: '#64748b' }
+        ],
+        margin: [15, 0, 15, 10]
+      };
+    }
+  };
+
+  console.log('[cv-pdf] Bloques en content:', content.length);
+  console.log('[cv-pdf] Tamaño JSON aproximado:', JSON.stringify(content).length, 'chars');
+
+  // 6. Avisar al usuario que empieza la generación real
+  if (onProgress) onProgress({ phase: 'building', label: isEs ? 'Generando PDF…' : 'Building PDF…' });
+
+  const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
+
+  // 7. getBuffer con timeout (más fiable que download())
+  console.time('[cv-pdf] createPdf');
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      console.timeEnd('[cv-pdf] createPdf');
+      reject(new Error(isEs
+        ? 'La generación del PDF tardó más de 90 s. El documento puede ser demasiado largo. Intenta con menos secciones o usa una conexión más rápida.'
+        : 'PDF generation took more than 90s. The document may be too large. Try with fewer sections or a faster connection.'));
+    }, 90000);
+
+    try {
+      const pdf = window.pdfMake.createPdf(docDef);
+      pdf.getBuffer((buffer) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        console.timeEnd('[cv-pdf] createPdf');
+        try {
+          const blob = new Blob([buffer], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+          console.log('[cv-pdf] ✓ PDF generado:', filename, '·', (blob.size / 1024).toFixed(0), 'KB');
+          resolve();
+        } catch (e) { reject(e); }
+      });
+    } catch (e) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      console.timeEnd('[cv-pdf] createPdf');
+      reject(e);
+    }
+  });
+}
 
   // ==========================================================================
   // ESTILOS (solo UI del menú, inyectados una sola vez)
