@@ -44,20 +44,6 @@
   let isExporting = false;
 
   // ==========================================================================
-  // CARGA DE html2pdf
-  // ==========================================================================
-  function loadHtml2Pdf() {
-    return new Promise((resolve, reject) => {
-      if (window.html2pdf) return resolve(window.html2pdf);
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      s.onload = () => resolve(window.html2pdf);
-      s.onerror = () => reject(new Error('No se pudo cargar html2pdf.js (revisa conexión o bloqueos)'));
-      document.head.appendChild(s);
-    });
-  }
-
-  // ==========================================================================
   // TRADUCCIÓN (MyMemory, gratuita, sin key)
   // ==========================================================================
   async function translate(text, targetLang) {
@@ -642,128 +628,180 @@
   }
 
   // ==========================================================================
-  // GENERACIÓN DEL PDF
-  // ==========================================================================
-  // ==========================================================================
-// GENERACIÓN DEL PDF
+// HELPERS nuevos
+// ==========================================================================
+function loadScript(url) {
+  if (!url) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('No se pudo cargar ' + url));
+    document.head.appendChild(s);
+  });
+}
+
+function createToast(message) {
+  const t = document.createElement('div');
+  t.style.cssText = `
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1e40af; color: #fff; padding: 12px 24px;
+    border-radius: 8px; font: 600 14px/1.4 'Inter', sans-serif;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25); z-index: 2147483647;
+    max-width: 90vw; text-align: center;
+  `;
+  t.textContent = message;
+  return t;
+}
+
+// ==========================================================================
+// GENERACIÓN DEL PDF (html2canvas + jsPDF, sin html2pdf)
 // ==========================================================================
 async function generatePdf(lang, onProgress) {
-  await loadHtml2Pdf();
+  // 1. Cargar librerías por separado (solo si no están ya cargadas)
+  await Promise.all([
+    window.html2canvas
+      ? null
+      : loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+    (window.jspdf && window.jspdf.jsPDF)
+      ? null
+      : loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  ]);
+
   injectStyles();
 
-  // 1. Construir el DOM del CV en memoria
+  // 2. Construir el DOM del CV (esto ya lo hacía buildCvRoot)
   const cvRoot = await buildCvRoot(lang, onProgress);
 
-  // 2. Overlay con spinner
-  const overlay = document.createElement('div');
-  overlay.id = 'cv-pdf-overlay';
-  overlay.innerHTML = `
-    <div>
-      <div class="cv-pdf-spinner"></div>
-      <div class="cv-pdf-overlay-text" id="cvpdf-overlay-text">
-        ${lang === 'es' ? 'Generando PDF…' : 'Generating PDF…'}
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+  // 3. Toast (mensaje abajo al centro, NO cubre el contenido)
+  const toast = createToast(lang === 'es' ? 'Generando PDF…' : 'Generating PDF…');
+  document.body.appendChild(toast);
 
-  // 3. Guardar estado que vamos a modificar durante la captura
-  const scrollX = window.scrollX;
-  const scrollY = window.scrollY;
-  const prevBodyOverflow = document.body.style.overflow;
-  const prevBodyOverflowX = document.body.style.overflowX;
-
-  // 4. Mount en el TOP del <body>, posición absolute (NO fixed)
+  // 4. Montar el CV VISIBLE en pantalla, esquina superior izquierda
   const mount = document.createElement('div');
   mount.id = 'cv-pdf-mount';
   mount.style.cssText = `
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 210mm;
-  min-height: 297mm;
-  background: #ffffff;
-  z-index: 1;
-  margin: 0;
-  padding: 0;
-  overflow: visible !important;
-  float: none !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 794px;
+    background: #ffffff;
+    z-index: 999998;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    pointer-events: none;
+    box-shadow: 0 0 40px rgba(0,0,0,0.15);
   `;
   mount.appendChild(cvRoot);
-  // Neutralizar el * { overflow: auto } global dentro del CV
-mount.querySelectorAll('*').forEach(function (el) {
-  el.style.overflow = 'visible';
-});
-mount.style.overflow = 'visible';
-  document.body.insertBefore(mount, document.body.firstChild);
-
-  // 5. Neutralizar el overflow de body (causa del recorte)
-  document.body.style.overflow = 'visible';
-  document.body.style.overflowX = 'visible';
-
-  // 6. Ir al principio del documento (el mount está en top:0 del documento)
-  window.scrollTo(0, 0);
+  document.body.appendChild(mount);
 
   try {
-    // 7. Esperar layout + imágenes reales
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await waitForImages(cvRoot, 8000);
+    // 5. Esperar imágenes + un margen para el layout
+    await waitForImages(cvRoot, 10000);
     await new Promise(r => setTimeout(r, 400));
 
-    // 8. Diagnóstico (queda en consola; útil si algo vuelve a fallar)
+    // 6. Diagnóstico en consola (nos dirá si algo falla)
     const rect = mount.getBoundingClientRect();
-    console.log('[cv-pdf] Mount size:', {
-      width: rect.width,
-      height: rect.height,
-      scrollWidth: mount.scrollWidth,
-      scrollHeight: mount.scrollHeight,
-      children: cvRoot.children.length
-    });
+    const diagnostics = {
+      mountWidth: Math.round(rect.width),
+      mountHeight: Math.round(rect.height),
+      childNodes: mount.querySelectorAll('*').length,
+      textLength: mount.textContent.trim().length
+    };
+    console.log('[cv-pdf] Diagnóstico:', diagnostics);
 
-    if (rect.height < 50) {
+    if (diagnostics.mountHeight < 100) {
       throw new Error(
-        'El contenedor del PDF tiene altura ' + rect.height + 'px. ' +
-        'Probablemente buildCvRoot no generó contenido.'
+        'El contenido del CV tiene solo ' + diagnostics.mountHeight + 'px de alto. ' +
+        'buildCvRoot() no generó contenido — revisa los errores de fetch en la consola.'
+      );
+    }
+    if (diagnostics.textLength < 100) {
+      throw new Error(
+        'El CV tiene solo ' + diagnostics.textLength + ' caracteres. ' +
+        'Probablemente las secciones fallaron al cargarse.'
       );
     }
 
-    // 9. Opciones CORREGIDAS de html2canvas
-    const opt = {
-      margin: [10, 12, 12, 12],
-      filename: `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: {
-        scale: 1.5,                // ← antes 2 (evita límite de canvas en CVs largos)
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-        // ← ELIMINADOS windowWidth/windowHeight: causaban el "viewport" de 0
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true
-      },
-      // ← Simplificado: 'legacy' + 'avoid-all' provocaban saltos erróneos
-      pagebreak: { mode: ['css'] }
-    };
+    // 7. Capturar con html2canvas directamente
+    const canvas = await window.html2canvas(mount, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      foreignObjectRendering: false,
+      removeContainer: true,
+      imageTimeout: 15000,
+      scrollX: 0,
+      scrollY: 0
+    });
+    console.log('[cv-pdf] Canvas capturado:', canvas.width, '×', canvas.height);
 
-    await html2pdf().set(opt).from(mount).save();
-    console.log('[cv-pdf] PDF generado correctamente.');
+    if (canvas.width === 0 || canvas.height === 0) {
+      throw new Error('Canvas vacío (0×0). html2canvas no pudo capturar el mount.');
+    }
+
+    // 8. Comprobar que el canvas NO es todo blanco (detecta fallo silencioso)
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(
+      Math.floor(canvas.width / 4),
+      Math.floor(canvas.height / 4),
+      Math.floor(canvas.width / 2),
+      Math.floor(canvas.height / 2)
+    ).data;
+    let nonWhite = 0;
+    for (let i = 0; i < data.length; i += 40) {
+      if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) nonWhite++;
+    }
+    console.log('[cv-pdf] Píxeles no-blancos en muestra:', nonWhite);
+    if (nonWhite === 0) {
+      console.warn('[cv-pdf] ⚠ El canvas parece blanco. Revisa opacity/visibility/overflow.');
+    }
+
+    // 9. Construir el PDF multipágina con jsPDF
+    const { jsPDF } = window.jspdf;
+    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    });
+
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const contentW = pdfW - 2 * margin;
+    const contentH = pdfH - 2 * margin;
+    const imgH = (canvas.height * contentW) / canvas.width;
+
+    let remaining = imgH;
+
+    // Página 1
+    pdf.addImage(imgData, 'JPEG', margin, margin, contentW, imgH);
+    remaining -= contentH;
+
+    // Páginas siguientes
+    while (remaining > 0.5) {
+      pdf.addPage();
+      const y = margin - (imgH - remaining);
+      pdf.addImage(imgData, 'JPEG', margin, y, contentW, imgH);
+      remaining -= contentH;
+    }
+
+    console.log('[cv-pdf] Páginas generadas:', pdf.internal.getNumberOfPages());
+    pdf.save(`CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`);
+    console.log('[cv-pdf] ✓ PDF guardado');
 
   } finally {
-    // 10. Restaurar SIEMPRE el estado original
-    if (mount.parentNode) mount.parentNode.removeChild(mount);
-    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    document.body.style.overflow = prevBodyOverflow;
-    document.body.style.overflowX = prevBodyOverflowX;
-    window.scrollTo(scrollX, scrollY);
+    if (toast.parentNode) document.body.removeChild(toast);
+    if (mount.parentNode) document.body.removeChild(mount);
   }
 }
+   
   // ==========================================================================
   // UI: PANEL EN EL MENÚ
   // ==========================================================================
