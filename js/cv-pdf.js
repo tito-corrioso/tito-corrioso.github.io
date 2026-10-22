@@ -1,28 +1,50 @@
 /* ============================================================================
    CV-PDF.JS — Exportación profesional del CV a PDF
-   Requiere: html2pdf.bundle.min.js (cargado desde CDN en el HTML)
+   ----------------------------------------------------------------------------
+   - Añade al menú desplegable un selector de idioma (EN/ES) + botón "Download"
+   - Fetch de todas las secciones desde sus URLs (education, work, projects,
+     courses, thesis, awards, congress, papers)
+   - Cabecera: foto (izq, más grande) · nombre / PhD / Curriculum Vitae / fecha
+     (centro) · QR (der, más pequeño) — el QR solo aparece en el PDF
+   - Orden: header → perfil → datos personales → education → work → projects
+     → courses → thesis → awards → congress → papers
+   - Traducción EN→ES vía MyMemory para las secciones traducibles.
+     Papers y Congress se mantienen SIEMPRE en su idioma original.
    ============================================================================ */
-
 (function () {
   'use strict';
 
   // ==========================================================================
-  // 1. CONFIGURACIÓN
+  // CONFIGURACIÓN
   // ==========================================================================
-  const CV_CONFIG = {
+  const CONFIG = {
     name: 'Osmani Tito-Corrioso',
     title: 'PhD. in Mathematical Science',
     cvLabel: 'Curriculum Vitae',
-    lastUpdate: new Date().toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'long', year: 'numeric'
-    }),
     photo: 'img/otc.jpg',
     qr: 'img/QR.jpg',
-    website: 'https://osmanitito.github.io/' // opcional, solo informativo
+    website: 'https://osmanitito.github.io/',
+    // Orden de secciones en el PDF (papers y congress al final, según pedido)
+    sections: [
+      { key: 'education', file: 'education.html', titleEn: 'Education',            titleEs: 'Educación',               translate: true  },
+      { key: 'work',      file: 'work.html',      titleEn: 'Work experience',      titleEs: 'Experiencia laboral',     translate: true  },
+      { key: 'projects',  file: 'projects.html',  titleEn: 'Projects',             titleEs: 'Proyectos',               translate: true  },
+      { key: 'courses',   file: 'courses.html',   titleEn: 'Courses',              titleEs: 'Cursos',                  translate: true  },
+      { key: 'thesis',    file: 'thesis.html',    titleEn: 'Thesis',               titleEs: 'Tesis',                   translate: true  },
+      { key: 'awards',    file: 'awards.html',    titleEn: 'Awards & acknowledgments', titleEs: 'Premios y reconocimientos', translate: true },
+      { key: 'congress',  file: 'congress.html',  titleEn: 'Congress',             titleEs: 'Congresos',               translate: false },
+      { key: 'papers',    file: 'papers.html',    titleEn: 'Papers',               titleEs: 'Publicaciones',           translate: false }
+    ]
   };
 
   // ==========================================================================
-  // 2. CARGA DINÁMICA DE html2pdf (si no está ya en la página)
+  // ESTADO
+  // ==========================================================================
+  const translationCache = new Map();
+  let isExporting = false;
+
+  // ==========================================================================
+  // CARGA DE html2pdf
   // ==========================================================================
   function loadHtml2Pdf() {
     return new Promise((resolve, reject) => {
@@ -30,377 +52,769 @@
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
       s.onload = () => resolve(window.html2pdf);
-      s.onerror = () => reject(new Error('No se pudo cargar html2pdf.js'));
+      s.onerror = () => reject(new Error('No se pudo cargar html2pdf.js (revisa conexión o bloqueos)'));
       document.head.appendChild(s);
     });
   }
 
   // ==========================================================================
-  // 3. TRADUCCIÓN (MyMemory API — gratuita, sin clave)
+  // TRADUCCIÓN (MyMemory, gratuita, sin key)
   // ==========================================================================
-  async function translateText(text, targetLang) {
+  async function translate(text, targetLang) {
     if (!text || targetLang === 'en') return text;
-    const url = 'https://api.mymemory.translated.net/get?' +
-      'q=' + encodeURIComponent(text.slice(0, 500)) +
-      '&langpair=en|' + targetLang;
+    const key = targetLang + '|' + text;
+    if (translationCache.has(key)) return translationCache.get(key);
+
+    const q = text.slice(0, 500);
+    const url = 'https://api.mymemory.translated.net/get?q=' +
+      encodeURIComponent(q) + '&langpair=en|' + targetLang;
+
     try {
-      const r = await fetch(url);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const r = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      return (j.responseData && j.responseData.translatedText) || text;
+      let result = text;
+      const t = j && j.responseData && j.responseData.translatedText;
+      if (t && !/PLEASE SELECT TWO DISTINCT|MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t)) {
+        result = t;
+      }
+      translationCache.set(key, result);
+      return result;
     } catch {
-      return text; // si falla, se queda en inglés
+      translationCache.set(key, text); // cacheamos el fallback también
+      return text;
     }
   }
 
-  // Traduce un array de strings en paralelo (con límite sencillo)
-  async function translateBatch(items, targetLang) {
-    if (targetLang === 'en') return items;
-    return Promise.all(items.map(t => translateText(t, targetLang)));
+  async function translateContainer(container, targetLang, onProgress) {
+    if (targetLang === 'en') return;
+
+    // Recolecta todos los nodos de texto traducibles
+    const textNodes = [];
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        let el = node.parentElement;
+        while (el && el !== container) {
+          if (el.dataset && el.dataset.noTranslate === 'true') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          el = el.parentElement;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let n;
+    while ((n = walker.nextNode())) textNodes.push(n);
+
+    const total = textNodes.length;
+    if (!total) { if (onProgress) onProgress(0, 0); return; }
+
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    let done = 0;
+
+    async function worker() {
+      while (cursor < textNodes.length) {
+        const idx = cursor++;
+        const node = textNodes[idx];
+        const original = node.nodeValue;
+        const leading = original.match(/^\s*/)[0];
+        const trailing = original.match(/\s*$/)[0];
+        const trimmed = original.trim();
+        try {
+          const translated = await translate(trimmed, targetLang);
+          if (translated && translated !== trimmed) {
+            node.nodeValue = leading + translated + trailing;
+          }
+        } catch {}
+        done++;
+        if (onProgress) onProgress(done, total);
+      }
+    }
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   }
 
   // ==========================================================================
-  // 4. EXTRACCIÓN DE DATOS DE LA PÁGINA ACTUAL
+  // EXTRACCIÓN DE CONTENIDO DEL DOM ACTUAL (index)
   // ==========================================================================
-  function getText(selector) {
-    const el = document.querySelector(selector);
-    return el ? el.textContent.trim() : '';
+  // Devuelve el texto visible del elemento en el idioma pedido, eliminando
+  // los <span lang="xx"> que no correspondan.
+  function pickLang(el, lang) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('[lang]').forEach(s => {
+      if (s.getAttribute('lang') !== lang) s.remove();
+    });
+    return clone.textContent.replace(/\s+/g, ' ').trim();
   }
 
-  function collectAbout() {
-    const ps = document.querySelectorAll('.about-text p[lang="en"]');
-    return Array.from(ps).map(p => p.textContent.trim());
+  function extractProfileFromDoc(doc, lang) {
+    const result = [];
+    doc.querySelectorAll('.about-text p[lang]').forEach(p => {
+      if (p.getAttribute('lang') === lang) {
+        const t = p.textContent.replace(/\s+/g, ' ').trim();
+        if (t) result.push(t);
+      }
+    });
+    return result;
   }
 
-  function collectSidebar() {
-    const cards = {};
-    document.querySelectorAll('aside .card').forEach(card => {
-      const title = card.querySelector('.card-title');
-      if (!title) return;
-      const key = title.textContent.trim().split('\n')[0].toLowerCase();
-      const items = Array.from(card.querySelectorAll('li')).map(li => li.textContent.trim());
-      cards[key] = items;
+  function extractSidebarFromDoc(doc, lang) {
+    const cards = [];
+    doc.querySelectorAll('aside .card').forEach(card => {
+      const titleEl = card.querySelector('.card-title');
+      if (!titleEl) return;
+      const title = pickLang(titleEl, lang);
+      const tLower = title.toLowerCase();
+      // Saltamos tarjetas irrelevantes para el PDF
+      if (tLower.includes('visit')) return;
+      if (tLower.includes('erd')) return;
+      if (tLower.includes('web')) return;
+
+      const items = [];
+      card.querySelectorAll('li').forEach(li => {
+        const link = li.querySelector('a[href]');
+        const text = pickLang(li, lang);
+        if (!text) return;
+        items.push(link ? { text, href: link.href } : { text });
+      });
+      if (items.length) cards.push({ title, items });
     });
     return cards;
   }
 
   // ==========================================================================
-  // 5. CONSTRUCCIÓN DEL HTML DEL CV (para el PDF)
+  // FETCH DE SECCIONES
   // ==========================================================================
-  async function buildCvHtml(lang) {
-    const isEs = lang === 'es';
+  async function fetchDoc(file) {
+    const candidates = [file, 'resources/' + file];
+    if (file === 'courses.html') candidates.push('cources.html', 'resources/cources.html');
 
-    // --- Datos base (textos que sí se traducen) ---
-    const aboutEn = collectAbout();
-    const about = isEs ? await translateBatch(aboutEn, 'es') : aboutEn;
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, { cache: 'no-cache' });
+        if (r.ok) {
+          const html = await r.text();
+          return new DOMParser().parseFromString(html, 'text/html');
+        }
+      } catch {}
+    }
+    throw new Error('No se pudo cargar ' + file);
+  }
 
-    const sidebar = collectSidebar();
+  async function fetchIndexDoc() {
+    return fetchDoc('index.html');
+  }
 
-    // --- Cabecera ---
-    const header = `
-      <header class="cv-header">
-        <div class="cv-header-left">
-          <img src="${CV_CONFIG.photo}" alt="Photo" class="cv-photo">
-        </div>
-        <div class="cv-header-center">
-          <h1 class="cv-name">${CV_CONFIG.name}</h1>
-          <p class="cv-title">${CV_CONFIG.title}</p>
-          <p class="cv-label">${CV_CONFIG.cvLabel}</p>
-          <p class="cv-date">${isEs ? 'Actualizado' : 'Updated'}: ${CV_CONFIG.lastUpdate}</p>
-        </div>
-        <div class="cv-header-right">
-          <img src="${CV_CONFIG.qr}" alt="QR" class="cv-qr">
-        </div>
-      </header>
-    `;
+  function getSectionGroup(entryEl) {
+    let el = entryEl;
+    while (el) {
+      if (el.classList && el.classList.contains('section')) break;
+      el = el.parentElement;
+    }
+    if (el) {
+      const h = el.querySelector('.section-title');
+      if (h) return h.textContent.trim();
+    }
+    return null;
+  }
 
-    // --- Perfil ---
-    const profile = `
-      <section class="cv-section">
-        <h2 class="cv-section-title">${isEs ? 'Perfil profesional' : 'Professional profile'}</h2>
-        ${about.map(p => `<p>${p}</p>`).join('')}
-      </section>
-    `;
-
-    // --- Datos personales / profesionales (extraídos del sidebar) ---
-    // Nota: los títulos de las tarjetas se traducen; el contenido se deja tal cual
-    //       (son datos objetivos: fechas, titulaciones, enlaces).
-    let personalHtml = '<section class="cv-section"><h2 class="cv-section-title">' +
-      (isEs ? 'Datos profesionales y personales' : 'Professional & personal details') +
-      '</h2><div class="cv-two-col">';
-
-    Object.keys(sidebar).forEach(key => {
-      // Saltamos tarjetas que no aportan al CV en PDF
-      if (key.includes('web') || key.includes('erd') || key.includes('visit')) return;
-      personalHtml += `<div class="cv-col"><h3>${key}</h3><ul>`;
-      sidebar[key].forEach(item => {
-        personalHtml += `<li>${item}</li>`;
+  function parseEntries(doc) {
+    const entries = [];
+    doc.querySelectorAll('.entry').forEach(entryEl => {
+      const yearEl = entryEl.querySelector('.entry-year');
+      const bodyEl = entryEl.querySelector('.entry-body');
+      if (!bodyEl) return;
+      entries.push({
+        year: yearEl ? yearEl.textContent.trim() : '',
+        html: bodyEl.innerHTML.trim(),
+        sectionGroup: getSectionGroup(entryEl)
       });
-      personalHtml += '</ul></div>';
     });
-    personalHtml += '</div></section>';
-
-    // --- Secciones con entradas (fecha + contenido) ---
-    // En el PDF solo incluimos las secciones más relevantes; el resto se puede
-    // añadir fácilmente siguiendo el mismo patrón.
-
-    // Función auxiliar para extraer entradas de una página (si existe)
-    // Como el PDF se genera desde index.html, las secciones de papers/congress
-    // no están en el DOM. Las incluimos manualmente resumidas o dejamos enlaces.
-    // Para mantener el PDF completo, se recomienda generar desde una página
-    // que contenga todo, o usar los datos del sidebar + about.
-
-    // --- Cierre ---
-    return `
-      <div class="cv-root">
-        ${header}
-        ${profile}
-        ${personalHtml}
-        <footer class="cv-footer">
-          <p>${CV_CONFIG.website}</p>
-        </footer>
-      </div>
-    `;
+    return entries;
   }
 
   // ==========================================================================
-  // 6. INYECCIÓN DE ESTILOS ESPECÍFICOS PARA EL PDF
+  // ESPERAR IMÁGENES
   // ==========================================================================
-  function injectPdfStyles() {
+  function waitForImages(root, timeoutMs = 5000) {
+    const imgs = Array.from(root.querySelectorAll('img'));
+    if (!imgs.length) return Promise.resolve();
+    return Promise.all(imgs.map(img => new Promise(resolve => {
+      if (img.complete && img.naturalWidth > 0) return resolve();
+      const done = () => { img.onload = img.onerror = null; resolve(); };
+      img.onload = done;
+      img.onerror = done;
+      setTimeout(done, timeoutMs);
+    })));
+  }
+
+  // ==========================================================================
+  // CONSTRUCCIÓN DEL HTML DEL CV
+  // ==========================================================================
+  async function buildCvRoot(lang, onProgress) {
+    const isEs = lang === 'es';
+    const root = document.createElement('div');
+    root.className = 'cv-root';
+
+    // ---------- Datos del index (perfil + sidebar) ----------
+    let profile, sidebar;
+    if (document.querySelector('.about-text') && document.querySelector('aside .card')) {
+      // Estamos en index.html → usar DOM local (más rápido y fiable)
+      profile = extractProfileFromDoc(document, lang);
+      sidebar = extractSidebarFromDoc(document, lang);
+    } else {
+      // Estamos en otra página → fetch de index.html
+      try {
+        const idxDoc = await fetchIndexDoc();
+        profile = extractProfileFromDoc(idxDoc, lang);
+        sidebar = extractSidebarFromDoc(idxDoc, lang);
+      } catch {
+        profile = [];
+        sidebar = [];
+      }
+    }
+
+    // ---------- CABECERA ----------
+    const dateStr = new Date().toLocaleDateString(
+      isEs ? 'es-ES' : 'en-GB',
+      { day: 'numeric', month: 'long', year: 'numeric' }
+    );
+    const header = document.createElement('header');
+    header.className = 'cv-header';
+    header.dataset.noTranslate = 'true'; // ya construido en idioma correcto
+    header.innerHTML = `
+      <div class="cv-header-left">
+        <img src="${CONFIG.photo}" alt="Photo" class="cv-photo">
+      </div>
+      <div class="cv-header-center">
+        <h1 class="cv-name">${CONFIG.name}</h1>
+        <p class="cv-title">${CONFIG.title}</p>
+        <p class="cv-label">${CONFIG.cvLabel}</p>
+        <p class="cv-date">${isEs ? 'Actualizado' : 'Updated'}: ${dateStr}</p>
+      </div>
+      <div class="cv-header-right">
+        <img src="${CONFIG.qr}" alt="QR" class="cv-qr">
+      </div>
+    `;
+    root.appendChild(header);
+
+    // ---------- PERFIL ----------
+    if (profile.length) {
+      const sec = document.createElement('section');
+      sec.className = 'cv-section';
+      sec.dataset.noTranslate = 'true'; // ya viene en el idioma correcto
+      sec.innerHTML = `<h2 class="cv-section-title">${isEs ? 'Perfil profesional' : 'Professional profile'}</h2>`;
+      profile.forEach(text => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        sec.appendChild(p);
+      });
+      root.appendChild(sec);
+    }
+
+    // ---------- SIDEBAR ----------
+    if (sidebar.length) {
+      const sec = document.createElement('section');
+      sec.className = 'cv-section';
+      sec.dataset.noTranslate = 'true';
+      sec.innerHTML = `<h2 class="cv-section-title">${isEs ? 'Datos profesionales y personales' : 'Professional & personal details'}</h2>`;
+      const grid = document.createElement('div');
+      grid.className = 'cv-sidebar-grid';
+      sidebar.forEach(card => {
+        const col = document.createElement('div');
+        col.className = 'cv-sidebar-col';
+        const h = document.createElement('h3');
+        h.textContent = card.title;
+        col.appendChild(h);
+        const ul = document.createElement('ul');
+        card.items.forEach(item => {
+          const li = document.createElement('li');
+          if (item.href) {
+            const a = document.createElement('a');
+            a.href = item.href;
+            a.textContent = item.text;
+            li.appendChild(a);
+          } else {
+            li.textContent = item.text;
+          }
+          ul.appendChild(li);
+        });
+        col.appendChild(ul);
+        grid.appendChild(col);
+      });
+      sec.appendChild(grid);
+      root.appendChild(sec);
+    }
+
+    // ---------- SECCIONES (fetch + parseo) ----------
+    const totalSections = CONFIG.sections.length;
+    const translatableSectionEls = [];
+
+    for (let i = 0; i < totalSections; i++) {
+      const s = CONFIG.sections[i];
+      if (onProgress) onProgress({
+        phase: 'fetch',
+        current: i + 1,
+        total: totalSections,
+        label: isEs ? s.titleEs : s.titleEn
+      });
+
+      const sec = document.createElement('section');
+      sec.className = 'cv-section';
+
+      try {
+        const doc = await fetchDoc(s.file);
+        const entries = parseEntries(doc);
+        if (!entries.length) continue;
+
+        const title = isEs ? s.titleEs : s.titleEn;
+        sec.innerHTML = `<h2 class="cv-section-title" data-no-translate="true">${title}</h2>`;
+        const list = document.createElement('div');
+        list.className = 'cv-entries';
+
+        let currentGroup = null;
+        entries.forEach(entry => {
+          if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
+            currentGroup = entry.sectionGroup;
+            const groupH = document.createElement('h3');
+            groupH.className = 'cv-subsection-title';
+            groupH.textContent = entry.sectionGroup;
+            if (!s.translate) groupH.dataset.noTranslate = 'true';
+            list.appendChild(groupH);
+          }
+          const el = document.createElement('div');
+          el.className = 'cv-entry';
+          if (!s.translate) el.dataset.noTranslate = 'true';
+          el.innerHTML = `
+            <div class="cv-entry-year">${entry.year || ''}</div>
+            <div class="cv-entry-body">${entry.html}</div>
+          `;
+          list.appendChild(el);
+        });
+
+        sec.appendChild(list);
+        root.appendChild(sec);
+
+        if (s.translate) translatableSectionEls.push(sec);
+      } catch (err) {
+        console.warn('[cv-pdf] Error cargando ' + s.file, err);
+        const title = isEs ? s.titleEs : s.titleEn;
+        sec.innerHTML = `
+          <h2 class="cv-section-title" data-no-translate="true">${title}</h2>
+          <p style="color:#94a3b8;font-style:italic;font-size:9pt;">
+            (${isEs ? 'Sección no disponible' : 'Section not available'})
+          </p>
+        `;
+        root.appendChild(sec);
+      }
+    }
+
+    // ---------- TRADUCCIÓN (solo secciones marcadas) ----------
+    if (lang !== 'en' && translatableSectionEls.length) {
+      if (onProgress) onProgress({ phase: 'translate', current: 0, total: 0 });
+
+      // Ejecutamos todas las secciones traducibles en paralelo
+      await Promise.all(translatableSectionEls.map(secEl =>
+        translateContainer(secEl, lang, (done, total) => {
+          if (onProgress) onProgress({ phase: 'translate', current: done, total });
+        })
+      ));
+    }
+
+    // ---------- PIE ----------
+    const footer = document.createElement('footer');
+    footer.className = 'cv-footer';
+    footer.dataset.noTranslate = 'true';
+    footer.textContent = CONFIG.website;
+    root.appendChild(footer);
+
+    return root;
+  }
+
+  // ==========================================================================
+  // ESTILOS (del PDF + de la UI del menú)
+  // ==========================================================================
+  function injectStyles() {
     if (document.getElementById('cv-pdf-styles')) return;
     const style = document.createElement('style');
     style.id = 'cv-pdf-styles';
     style.textContent = `
+      /* ============ CONTENIDO DEL PDF ============ */
       .cv-root {
         font-family: 'Inter', Arial, Helvetica, sans-serif;
         font-size: 10pt;
         color: #1e293b;
         line-height: 1.5;
-        background: #fff;
+        background: #ffffff;
         padding: 0;
       }
 
-      /* --- Cabecera de 3 columnas --- */
+      /* Cabecera */
       .cv-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
-        padding-bottom: 1rem;
+        gap: 16px;
+        padding-bottom: 14px;
         border-bottom: 3px solid #1e40af;
-        margin-bottom: 1.5rem;
+        margin-bottom: 18px;
       }
-      .cv-header-left { flex: 0 0 auto; }
-      .cv-header-center { flex: 1 1 auto; text-align: center; }
-      .cv-header-right { flex: 0 0 auto; }
-
+      .cv-header-left, .cv-header-right { flex: 0 0 auto; }
+      .cv-header-center { flex: 1 1 auto; text-align: center; padding: 0 10px; }
       .cv-photo {
-        width: 110px;
-        height: 110px;
-        object-fit: cover;
+        width: 120px; height: 120px;
         border-radius: 50%;
         border: 3px solid #1e40af;
+        object-fit: cover;
+        display: block;
       }
       .cv-qr {
-        width: 80px;
-        height: 80px;
+        width: 90px; height: 90px;
         object-fit: contain;
+        display: block;
       }
-
       .cv-name {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 22pt;
+        font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+        font-size: 22pt; font-weight: 700;
         color: #1e3a8a;
-        margin: 0 0 .15rem;
+        margin: 0 0 4px 0; line-height: 1.15;
       }
       .cv-title {
-        font-size: 11pt;
-        color: #1e40af;
-        margin: 0;
-        font-weight: 600;
+        font-size: 11pt; font-weight: 600;
+        color: #1e40af; margin: 0 0 2px 0;
       }
       .cv-label {
-        font-size: 10pt;
-        color: #64748b;
-        margin: .15rem 0;
-        letter-spacing: .05em;
-        text-transform: uppercase;
+        font-size: 9pt; color: #64748b;
+        text-transform: uppercase; letter-spacing: 0.15em;
+        margin: 2px 0;
       }
-      .cv-date {
-        font-size: 9pt;
-        color: #64748b;
-        margin: 0;
-      }
+      .cv-date { font-size: 8.5pt; color: #64748b; margin: 0; }
 
-      /* --- Secciones --- */
-      .cv-section { margin-bottom: 1.5rem; }
+      /* Secciones */
+      .cv-section { margin-bottom: 16px; }
       .cv-section-title {
         font-family: 'Playfair Display', Georgia, serif;
-        font-size: 14pt;
+        font-size: 13.5pt; font-weight: 700;
         color: #1e3a8a;
         border-bottom: 2px solid #f59e0b;
-        padding-bottom: .25rem;
-        margin-bottom: .75rem;
+        padding-bottom: 3px; margin: 0 0 10px 0;
       }
-      .cv-section p { margin: 0 0 .6rem; text-align: justify; }
-
-      /* --- Dos columnas para datos personales --- */
-      .cv-two-col {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
+      .cv-section p {
+        margin: 0 0 8px 0;
+        text-align: justify;
+        font-size: 9.5pt; line-height: 1.55;
       }
-      .cv-col h3 {
-        font-size: 11pt;
+      .cv-subsection-title {
+        font-size: 10.5pt; font-weight: 700;
         color: #1e40af;
-        margin: 0 0 .4rem;
-        font-weight: 700;
+        margin: 10px 0 6px 0; padding-bottom: 2px;
+        border-bottom: 1px dashed #cbd5e1;
       }
-      .cv-col ul { list-style: disc; padding-left: 1.2rem; }
-      .cv-col li { margin-bottom: .2rem; font-size: 9.5pt; }
 
-      /* --- Pie --- */
+      /* Grid de sidebar */
+      .cv-sidebar-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      }
+      .cv-sidebar-col h3 {
+        font-size: 10pt; font-weight: 700;
+        color: #1e40af; margin: 0 0 4px 0;
+      }
+      .cv-sidebar-col ul { list-style: disc; padding-left: 14px; margin: 0; }
+      .cv-sidebar-col li {
+        font-size: 9pt; margin-bottom: 2px; line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .cv-sidebar-col a { color: #1e40af; text-decoration: none; }
+
+      /* Entradas (dos columnas: año | cuerpo) */
+      .cv-entry {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 12px;
+        padding: 6px 0;
+        border-bottom: 1px solid #e2e8f0;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .cv-entry:last-child { border-bottom: none; }
+      .cv-entry-year {
+        font-weight: 700; font-size: 9pt;
+        color: #1e40af; line-height: 1.4;
+      }
+      .cv-entry-body {
+        font-size: 9.5pt; line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+      .cv-entry-body strong { color: #1e3a8a; }
+      .cv-entry-body em { color: #475569; }
+      .cv-entry-body a {
+        color: #1e40af; text-decoration: none;
+        font-size: 8.5pt; font-weight: 600;
+      }
       .cv-footer {
-        margin-top: 2rem;
-        padding-top: .75rem;
+        margin-top: 20px; padding-top: 8px;
         border-top: 1px solid #cbd5e1;
-        text-align: center;
-        font-size: 8.5pt;
-        color: #64748b;
+        text-align: center; font-size: 8pt; color: #64748b;
       }
 
-      /* --- Forzar que el PDF no parta elementos --- */
-      .cv-section, .cv-header { break-inside: avoid; page-break-inside: avoid; }
+      /* ============ UI DEL MENÚ ============ */
+      .cv-pdf-box {
+        padding: 10px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin: 4px 6px;
+      }
+      .cv-pdf-box-label {
+        display: block; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        color: #64748b; font-weight: 700; margin-bottom: 6px;
+      }
+      .cv-pdf-box-row { display: flex; gap: 6px; align-items: stretch; }
+      .cv-pdf-lang {
+        flex: 0 0 auto;
+        padding: 6px 8px;
+        border: 1px solid #cbd5e1; border-radius: 6px;
+        background: #fff; font-size: 13px; color: #1e293b;
+        cursor: pointer; outline: none;
+      }
+      .cv-pdf-lang:focus { border-color: #1e40af; }
+      .cv-pdf-export {
+        flex: 1 1 auto;
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: #1e40af; color: #fff;
+        border: none; border-radius: 6px;
+        font-size: 13px; font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .cv-pdf-export:hover { background: #1e3a8a; }
+      .cv-pdf-export:disabled { opacity: 0.6; cursor: not-allowed; }
+      .cv-pdf-status {
+        margin-top: 6px; font-size: 11px;
+        color: #64748b; min-height: 14px;
+        line-height: 1.3; display: none;
+      }
+      .cv-pdf-status.show { display: block; }
+      .cv-pdf-status.error { color: #dc2626; }
+
+      /* ============ OVERLAY / SPINNER ============ */
+      #cv-pdf-overlay {
+        position: fixed; inset: 0;
+        background: rgba(248, 250, 252, 0.96);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Inter', -apple-system, sans-serif;
+      }
+      #cv-pdf-overlay .cv-pdf-spinner {
+        width: 44px; height: 44px;
+        border: 4px solid #e2e8f0;
+        border-top-color: #1e40af;
+        border-radius: 50%;
+        animation: cvpdf-spin 1s linear infinite;
+        margin: 0 auto 14px;
+      }
+      #cv-pdf-overlay .cv-pdf-overlay-text {
+        font-size: 15px; font-weight: 600; color: #1e40af;
+        text-align: center; padding: 0 20px;
+      }
+      @keyframes cvpdf-spin { to { transform: rotate(360deg); } }
+
+      @media print {
+        .cv-pdf-box, #cv-pdf-overlay { display: none !important; }
+      }
     `;
     document.head.appendChild(style);
   }
 
   // ==========================================================================
-  // 7. GENERACIÓN Y DESCARGA DEL PDF
+  // GENERACIÓN DEL PDF
   // ==========================================================================
-  async function generatePdf(lang) {
-    // 1. Cargar librería
+  async function generatePdf(lang, onProgress) {
     await loadHtml2Pdf();
+    injectStyles();
 
-    // 2. Inyectar estilos
-    injectPdfStyles();
+    // 1. Construir el DOM del CV en memoria
+    const cvRoot = await buildCvRoot(lang, onProgress);
 
-    // 3. Construir HTML
-    const html = await buildCvHtml(lang);
+    // 2. Overlay (spinner) — oculta visualmente el contenedor al usuario
+    const overlay = document.createElement('div');
+    overlay.id = 'cv-pdf-overlay';
+    overlay.innerHTML = `
+      <div>
+        <div class="cv-pdf-spinner"></div>
+        <div class="cv-pdf-overlay-text" id="cvpdf-overlay-text">
+          ${lang === 'es' ? 'Generando PDF…' : 'Generating PDF…'}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
 
-    // 4. Crear contenedor temporal (oculto en la página, pero renderizable)
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '210mm'; // ancho A4 aproximado
-    container.style.background = '#fff';
-    container.innerHTML = html;
-    document.body.appendChild(container);
+    // 3. Contenedor REAL (visible, en el flujo) — bajo el overlay
+    const mount = document.createElement('div');
+    mount.id = 'cv-pdf-mount';
+    mount.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 210mm;
+      background: #ffffff;
+      z-index: 99998;
+      pointer-events: none;
+    `;
+    mount.appendChild(cvRoot);
+    document.body.appendChild(mount);
 
-    // 5. Opciones de html2pdf
-    const opt = {
-      margin: [10, 12, 12, 12], // mm
-      filename: `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true
-      },
-      pagebreak: {
-        mode: ['avoid-all', 'css'],
-        avoid: ['.cv-section', '.cv-header']
-      }
-    };
-
-    // 6. Generar PDF
     try {
-      await html2pdf().set(opt).from(container).save();
+      // 4. Esperar imágenes + un pequeño margen para layout
+      await waitForImages(cvRoot);
+      await new Promise(r => setTimeout(r, 250));
+
+      // 5. Generar y descargar
+      const opt = {
+        margin: [10, 12, 12, 12],
+        filename: `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: mount.scrollWidth,
+          windowHeight: mount.scrollHeight,
+          logging: false
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+          compress: true
+        },
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          avoid: ['.cv-entry', '.cv-section-title', '.cv-subsection-title', '.cv-header']
+        }
+      };
+
+      await html2pdf().set(opt).from(mount).save();
     } finally {
-      // 7. Limpiar
-      document.body.removeChild(container);
+      // 6. Limpieza SIEMPRE
+      document.body.removeChild(mount);
+      document.body.removeChild(overlay);
     }
   }
 
   // ==========================================================================
-  // 8. UI: BOTÓN EN EL MENÚ + SELECTOR DE IDIOMA
+  // UI: PANEL EN EL MENÚ
   // ==========================================================================
-  function createPdfButton() {
+  function createUi() {
     const dropdown = document.querySelector('.nav-dropdown');
     if (!dropdown) return;
-
-    // Evitar duplicados
     if (document.getElementById('cv-pdf-li')) return;
 
     const li = document.createElement('li');
     li.id = 'cv-pdf-li';
-    li.style.cssText = 'border-top:1px solid var(--border,#e2e8f0);margin-top:.35rem;padding-top:.35rem;';
+    li.style.cssText = 'border-top:1px solid #e2e8f0;margin-top:6px;padding-top:6px;';
 
     li.innerHTML = `
-      <a href="#" id="cv-pdf-trigger"
-         style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;
-                border-radius:8px;color:var(--text,#1e293b);
-                font-weight:600;font-size:.95rem;text-decoration:none;
-                transition:background .2s ease;">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
-             style="flex-shrink:0;color:#ef4444;">
-          <path d="M7 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5H7Zm7 1.5L18.5 9H14V4.5ZM8 13h8v1.5H8V13Zm0 3h8v1.5H8V16Z"/>
-        </svg>
-        <span>
-          <span lang="en">Download CV (PDF)</span>
-          <span lang="es">Descargar CV (PDF)</span>
-        </span>
-      </a>
+      <div class="cv-pdf-box">
+        <label class="cv-pdf-box-label">
+          <span lang="en">Export CV</span>
+          <span lang="es">Exportar CV</span>
+        </label>
+        <div class="cv-pdf-box-row">
+          <select class="cv-pdf-lang" aria-label="PDF language">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+          <button type="button" class="cv-pdf-export">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <path d="M7 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5H7Zm7 1.5L18.5 9H14V4.5ZM8 13h8v1.5H8V13Zm0 3h8v1.5H8V16Z"/>
+            </svg>
+            <span lang="en">Download PDF</span>
+            <span lang="es">Descargar PDF</span>
+          </button>
+        </div>
+        <div class="cv-pdf-status" role="status" aria-live="polite"></div>
+      </div>
     `;
+    dropdown.appendChild(li);
 
-    li.querySelector('#cv-pdf-trigger').addEventListener('click', async (e) => {
-      e.preventDefault();
+    const select = li.querySelector('.cv-pdf-lang');
+    const btn = li.querySelector('.cv-pdf-export');
+    const statusEl = li.querySelector('.cv-pdf-status');
 
-      // Cerrar el menú desplegable
+    // Inicializa con el idioma actual del sitio
+    select.value = (document.documentElement.getAttribute('data-lang') === 'es') ? 'es' : 'en';
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text || '';
+      statusEl.classList.toggle('show', !!text);
+      statusEl.classList.toggle('error', !!isError);
+    }
+
+    function setOverlayText(text) {
+      const t = document.getElementById('cvpdf-overlay-text');
+      if (t) t.textContent = text;
+    }
+
+    btn.addEventListener('click', async () => {
+      if (isExporting) return;
+      isExporting = true;
+      btn.disabled = true;
+      setStatus('');
+
+      const lang = select.value === 'es' ? 'es' : 'en';
+      const isEs = lang === 'es';
+
+      // Cierra el menú
       const navDropdown = document.querySelector('.nav-dropdown');
       if (navDropdown) navDropdown.classList.remove('open');
 
-      // Preguntar idioma (solo si el usuario quiere traducir)
-      const wantEs = window.confirm(
-        '¿Desea exportar el CV también en español?\\n\\n' +
-        'Aceptar = Español (se traducirán los textos, excepto publicaciones y congresos)\\n' +
-        'Cancelar = English'
-      );
-
-      const lang = wantEs ? 'es' : 'en';
-
-      // Feedback visual
-      li.querySelector('a').style.opacity = '.6';
-      li.querySelector('a').style.pointerEvents = 'none';
+      const onProgress = (info) => {
+        if (info.phase === 'fetch') {
+          const msg = (isEs ? 'Cargando ' : 'Loading ') + info.label +
+                      ' (' + info.current + '/' + info.total + ')';
+          setStatus(msg);
+          setOverlayText(msg);
+        } else if (info.phase === 'translate') {
+          const msg = (info.total > 0)
+            ? (isEs ? 'Traduciendo… ' : 'Translating… ') + info.current + '/' + info.total
+            : (isEs ? 'Traduciendo…' : 'Translating…');
+          setStatus(msg);
+          setOverlayText(msg);
+        }
+      };
 
       try {
-        await generatePdf(lang);
+        await generatePdf(lang, onProgress);
+        setStatus(isEs ? '✓ PDF descargado' : '✓ PDF downloaded');
+        setTimeout(() => setStatus(''), 4000);
       } catch (err) {
-        console.error(err);
-        alert('No se pudo generar el PDF. Revisa la consola para más detalles.');
+        console.error('[cv-pdf]', err);
+        setStatus((isEs ? 'Error: ' : 'Error: ') + err.message, true);
       } finally {
-        li.querySelector('a').style.opacity = '';
-        li.querySelector('a').style.pointerEvents = '';
+        isExporting = false;
+        btn.disabled = false;
       }
     });
-
-    dropdown.appendChild(li);
   }
 
   // ==========================================================================
-  // 9. INICIALIZACIÓN
+  // INICIALIZACIÓN
   // ==========================================================================
-  function init() {
-    createPdfButton();
-  }
-
+  function init() { createUi(); }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
