@@ -480,6 +480,19 @@
     ];
   }
 
+  // Sanea atributos href (decodifica &amp;, elimina backslashes, escapa espacios)
+function sanitizeEntryHtml(html) {
+  if (!html) return '';
+  return html.replace(/href=(["'])(.*?)\1/gi, function (match, quote, url) {
+    let u = url
+      .replace(/&amp;/g, '&')       // HTML entity → char real
+      .replace(/\\/g, '')            // quitar backslashes (typos frecuentes)
+      .replace(/\s+/g, '%20')        // espacios → %20
+      .trim();
+    return 'href=' + quote + u + quote;
+  });
+}
+
   function buildSectionPdf(section, translatedEntries, lang) {
   const isEs = lang === 'es';
   if (!translatedEntries.length) return null;
@@ -835,7 +848,9 @@
             ? (isEs ? 'Traduciendo… ' : 'Translating… ') + info.current + '/' + info.total
             : (isEs ? 'Traduciendo…' : 'Translating…');
           setStatus(msg);
-        }
+        } else if (info.phase === 'building') {
+  setStatus(isEs ? 'Generando PDF… (puede tardar hasta 30 s)' : 'Building PDF… (may take up to 30 s)');
+}
       };
 
       try {
