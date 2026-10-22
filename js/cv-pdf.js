@@ -78,11 +78,6 @@
     tasks.push(loadScript('https://unpkg.com/pdfmake@0.3/build/vfs_fonts.js'));
   }
 
-  // 3. Cargar html-to-pdfmake (conversor de HTML)
-  if (!window.htmlToPdfmake) {
-    tasks.push(loadScript('https://cdn.jsdelivr.net/npm/html-to-pdfmake@2.5.4/browser.js'));
-  }
-
   await Promise.all(tasks);
 
   // Verificación final
@@ -91,9 +86,6 @@
   }
   if (typeof window.pdfMake.createPdf !== 'function') {
     throw new Error('pdfMake.createPdf no está disponible. Revisa que vfs_fonts.js se haya cargado.');
-  }
-  if (!window.htmlToPdfmake) {
-    throw new Error('html-to-pdfmake no se cargó correctamente');
   }
 }
 
