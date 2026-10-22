@@ -55,21 +55,52 @@
   }
 
   /* ---------- 3. Scroll reveal ---------- */
-  var revealEls = document.querySelectorAll('.reveal');
-  if ('IntersectionObserver' in window && revealEls.length) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          io.unobserve(entry.target);
+var revealEls = document.querySelectorAll('.reveal');
+
+if ('IntersectionObserver' in window && revealEls.length) {
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -20px 0px' });
+
+  // Doble rAF: garantiza que el navegador pintó el estado inicial (opacity 0)
+  // antes de añadir .visible, para que la transición SÍ se reproduzca.
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+
+      revealEls.forEach(function (el, i) {
+        var rect = el.getBoundingClientRect();
+
+        // ¿Ya está (total o parcialmente) dentro del viewport al cargar?
+        var isInViewport = rect.top < vh - 20 && rect.bottom > 0;
+
+        if (isInViewport) {
+          // Pequeño stagger para una entrada agradable (máx. 240 ms acumulados)
+          var delay = Math.min(i * 60, 240);
+          if (delay > 0) {
+            el.style.transitionDelay = delay + 'ms';
+            el.addEventListener('transitionend', function handler() {
+              el.style.transitionDelay = '';
+              el.removeEventListener('transitionend', handler);
+            });
+          }
+          el.classList.add('visible');
+        } else {
+          // Está por debajo del fold: se revelará al hacer scroll
+          io.observe(el);
         }
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    revealEls.forEach(function (el) { io.observe(el); });
-  } else {
-    // fallback
-    revealEls.forEach(function (el) { el.classList.add('visible'); });
-  }
+    });
+  });
+} else {
+  // Fallback: sin IntersectionObserver, todo visible
+  revealEls.forEach(function (el) { el.classList.add('visible'); });
+}
 
   /* ---------- 4. Back to top ---------- */
   var backBtn = document.querySelector('.back-to-top');
