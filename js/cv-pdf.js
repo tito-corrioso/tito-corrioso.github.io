@@ -445,6 +445,11 @@
     style.id = 'cv-pdf-styles';
     style.textContent = `
       /* ============ CONTENIDO DEL PDF ============ */
+     .cv-root,
+.cv-root * {
+  overflow: visible !important;
+  float: none !important;
+}
       .cv-root {
         font-family: 'Inter', Arial, Helvetica, sans-serif;
         font-size: 10pt;
@@ -672,17 +677,24 @@ async function generatePdf(lang, onProgress) {
   const mount = document.createElement('div');
   mount.id = 'cv-pdf-mount';
   mount.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 210mm;
-    min-height: 297mm;
-    background: #ffffff;
-    z-index: 1;
-    margin: 0;
-    padding: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 210mm;
+  min-height: 297mm;
+  background: #ffffff;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  overflow: visible !important;
+  float: none !important;
   `;
   mount.appendChild(cvRoot);
+  // Neutralizar el * { overflow: auto } global dentro del CV
+mount.querySelectorAll('*').forEach(function (el) {
+  el.style.overflow = 'visible';
+});
+mount.style.overflow = 'visible';
   document.body.insertBefore(mount, document.body.firstChild);
 
   // 5. Neutralizar el overflow de body (causa del recorte)
