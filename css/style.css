@@ -439,6 +439,22 @@ body {
   html { scroll-behavior: auto; }
 }
 
+/* Red de seguridad: si el JS tarda >1.8s o falla, se revela igualmente */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity .7s ease, transform .7s ease;
+  animation: reveal-safety 0s 1.8s forwards;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+  animation: none; /* el JS ganó la carrera */
+}
+@keyframes reveal-safety {
+  to { opacity: 1; transform: none; }
+}
+
 /* ============================================================
    FOOTER
    ============================================================ */
