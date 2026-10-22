@@ -15,8 +15,8 @@
   // ==========================================================================
   const WHATSAPP_CONFIG = {
     phone:   '5354089688',          // sin '+', sin espacios (para wa.me)
-    display: '+53 5408 9688',       // cómo se muestra en pantalla
-    message: 'Hola Osmani, vi tu página web y me gustaría ponerme en contacto contigo.'
+    display: '+53 54089688',       // cómo se muestra en pantalla
+    message: 'Hi Osmani!'
   };
 
   // Enlace oficial de WhatsApp con mensaje prellenado
