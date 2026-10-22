@@ -483,100 +483,147 @@
   // Sanea atributos href (decodifica &amp;, elimina backslashes, escapa espacios)
 function sanitizeEntryHtml(html) {
   if (!html) return '';
-  return html.replace(/href=(["'])(.*?)\1/gi, function (match, quote, url) {
-    let u = url
-      .replace(/&amp;/g, '&')       // HTML entity → char real
-      .replace(/\\/g, '')            // quitar backslashes (typos frecuentes)
-      .replace(/\s+/g, '%20')        // espacios → %20
+  // 1) Limpiar hrefs malformados
+  let out = html.replace(/href=(["'])(.*?)\1/gi, function (match, quote, url) {
+    const u = url
+      .replace(/&amp;/g, '&')
+      .replace(/\\/g, '')
+      .replace(/\s+/g, '%20')
       .trim();
     return 'href=' + quote + u + quote;
   });
+  // 2) Eliminar cualquier tag que no sea strong/b/i/em/a/br
+  out = out.replace(/<(\/?)([a-z][a-z0-9]*)\b[^>]*>/gi, function (m, slash, name) {
+    const n = name.toLowerCase();
+    const keep = ['strong', 'b', 'i', 'em', 'a', 'br'];
+    return keep.includes(n) ? m : '';
+  });
+  return out;
 }
 
-  function buildSectionPdf(section, translatedEntries, lang) {
+  // Conversor HTML → rich text de pdfmake, sin getComputedStyle (10–50x más rápido)
+function fastHtmlToPdfmake(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const segments = [];
+
+  function pushText(text, style) {
+    if (!text) return;
+    text = text.replace(/\s+/g, ' ');
+    if (!text) return;
+    const styleKey = style ? JSON.stringify(style) : '';
+    const last = segments[segments.length - 1];
+    const lastKey = last ? JSON.stringify(last._k || {}) : null;
+    if (last && lastKey === styleKey) {
+      last.text += text;
+    } else {
+      const node = { text };
+      if (style && Object.keys(style).length) Object.assign(node, style);
+      node._k = style || {};
+      segments.push(node);
+    }
+  }
+
+  function walk(node, inherited) {
+    if (node.nodeType === 3) { pushText(node.nodeValue, inherited); return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    const ns = { ...(inherited || {}) };
+    if (tag === 'strong' || tag === 'b') ns.bold = true;
+    if (tag === 'em' || tag === 'i') ns.italics = true;
+    if (tag === 'br') { pushText(' ', inherited); return; }
+    if (tag === 'a') {
+      const href = node.getAttribute('href');
+      if (href && href !== '#' && !href.startsWith('javascript:')) {
+        ns.link = href;
+        ns.color = '#1e40af';
+        ns.decoration = 'underline';
+      }
+    }
+    for (const child of node.childNodes) walk(child, ns);
+  }
+
+  walk(div, null);
+  segments.forEach(s => delete s._k);
+
+  if (segments.length === 0) return [];
+  if (segments.length === 1) return [segments[0]];
+  return [{ text: segments }];
+}
+   
+   function buildSectionPdf(section, translatedEntries, lang) {
   const isEs = lang === 'es';
   if (!translatedEntries.length) return null;
 
   const out = [sectionTitleBlock(isEs ? section.titleEs : section.titleEn)];
+  const tableBody = [];
   let currentGroup = null;
   let ok = 0, skipped = 0;
+  const t0 = performance.now();
 
   for (const entry of translatedEntries) {
     if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
       currentGroup = entry.sectionGroup;
-      out.push({
-        text: currentGroup,
-        fontSize: 11,
-        bold: true,
-        color: '#1e40af',
-        margin: [0, 8, 0, 4]
-      });
+      tableBody.push([
+        { text: '', border: [false, false, false, false] },
+        {
+          text: currentGroup,
+          bold: true,
+          color: '#1e40af',
+          fontSize: 11,
+          margin: [0, 8, 0, 4],
+          border: [false, false, false, false]
+        }
+      ]);
     }
 
     let bodyContent;
     try {
       const cleanHtml = sanitizeEntryHtml(entry.dom.innerHTML);
-      bodyContent = window.htmlToPdfmake(cleanHtml, {
-        window: window,
-        defaultStyles: {
-          a: { color: '#1e40af', decoration: 'underline' },
-          strong: { bold: true },
-          b: { bold: true },
-          em: { italics: true },
-          i: { italics: true }
-        }
-      });
-      if (!Array.isArray(bodyContent)) bodyContent = [bodyContent];
-      // Filtrar nodos vacíos / nulos recursivamente
-      bodyContent = bodyContent
-        .filter(n => n != null && n !== '')
-        .map(n => {
-          if (typeof n === 'object' && n.stack) {
-            n.stack = n.stack.filter(x => x != null && x !== '');
-          }
-          return n;
-        });
+      bodyContent = fastHtmlToPdfmake(cleanHtml);
     } catch (e) {
-      console.warn('[cv-pdf] htmlToPdfmake falló para entrada ' + (entry.year || '?') + ':', e.message);
+      console.warn('[cv-pdf] Conversión falló (' + (entry.year || '?') + '):', e.message);
       bodyContent = [];
     }
 
-    // Fallback: si el HTML no se pudo convertir, usar texto plano
-    if (!bodyContent.length) {
+    if (!bodyContent || !bodyContent.length) {
       const plain = (entry.dom.textContent || '').replace(/\s+/g, ' ').trim();
-      if (plain) {
-        bodyContent = [{ text: plain.substring(0, 2000), fontSize: 9 }];
-      } else {
-        skipped++;
-        continue;
-      }
+      if (plain) bodyContent = [{ text: plain.substring(0, 2000) }];
+      else { skipped++; continue; }
     }
 
-    out.push({
-      columns: [
-        {
-          text: entry.year || '',
-          width: 78,
-          bold: true,
-          color: '#1e40af',
-          fontSize: 9,
-          alignment: 'left'
-        },
-        {
-          stack: bodyContent,
-          width: '*',
-          fontSize: 9,
-          alignment: 'left'
-        }
-      ],
-      columnGap: 10,
-      margin: [0, 4, 0, 4]
-    });
+    tableBody.push([
+      {
+        text: entry.year || '',
+        bold: true,
+        color: '#1e40af',
+        fontSize: 9,
+        border: [false, false, false, false],
+        margin: [0, 3, 0, 3]
+      },
+      {
+        text: bodyContent,
+        fontSize: 9,
+        border: [false, false, false, false],
+        margin: [0, 3, 0, 3]
+      }
+    ]);
     ok++;
   }
 
-  console.log('[cv-pdf] ' + section.key + ': ' + ok + ' ok, ' + skipped + ' omitidas');
-  return out.length > 1 ? out : null;
+  if (!tableBody.length) return null;
+
+  out.push({
+    table: {
+      widths: [78, '*'],
+      body: tableBody
+    },
+    layout: 'noBorders'
+  });
+
+  console.log('[cv-pdf] ' + section.key + ': ' + ok + ' ok, ' + skipped +
+              ' omitidas · ' + Math.round(performance.now() - t0) + 'ms');
+  return out;
 }
 
   // ==========================================================================
