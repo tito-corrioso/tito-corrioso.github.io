@@ -1,15 +1,23 @@
 /* ============================================================================
-   CV-PDF.JS — Exportación profesional del CV a PDF
+   CV-PDF.JS v4 — Exportación profesional del CV a PDF (texto vectorial real)
    ----------------------------------------------------------------------------
-   - Añade al menú desplegable un selector de idioma (EN/ES) + botón "Download"
-   - Fetch de todas las secciones desde sus URLs (education, work, projects,
-     courses, thesis, awards, congress, papers)
-   - Cabecera: foto (izq, más grande) · nombre / PhD / Curriculum Vitae / fecha
-     (centro) · QR (der, más pequeño) — el QR solo aparece en el PDF
-   - Orden: header → perfil → datos personales → education → work → projects
-     → courses → thesis → awards → congress → papers
-   - Traducción EN→ES vía MyMemory para las secciones traducibles.
-     Papers y Congress se mantienen SIEMPRE en su idioma original.
+   Migración de html2canvas+jsPDF (imagen) a pdfmake (texto vectorial real).
+   
+   Conservado del código anterior:
+   - CONFIG (con secciones y orden respetados)
+   - Sistema de traducción MyMemory (translate, translateContainer)
+   - Extracción de datos (pickLang, extractProfileFromDoc, extractSidebarFromDoc)
+   - Fetch de secciones con fallback a resources/
+   - Interfaz de progreso (onProgress con fases fetch/translate)
+   - Panel UI del menú (createUi) y sus estilos
+   
+   Nuevo:
+   - PDF con texto seleccionable, buscable y copiable
+   - Links clickables en "Personal details" (mailto, WhatsApp) y "Web sites"
+   - Foto circular arriba-izquierda, QR arriba-derecha (solo en PDF)
+   - Márgenes fijos (15mm izq/der, 20mm arriba, 22mm abajo)
+   - Footer con URL del sitio + "N / total" en cada página
+   - Papers y Congress siempre en idioma original
    ============================================================================ */
 (function () {
   'use strict';
@@ -24,16 +32,15 @@
     photo: 'img/otc.jpg',
     qr: 'img/QR.jpg',
     website: 'https://tito-corrioso.github.io/',
-    // Orden de secciones en el PDF (papers y congress al final, según pedido)
     sections: [
-      { key: 'education', file: 'education.html', titleEn: 'Education',            titleEs: 'Educación',               translate: true  },
-      { key: 'work',      file: 'work.html',      titleEn: 'Work experience',      titleEs: 'Experiencia laboral',     translate: true  },
-      { key: 'projects',  file: 'projects.html',  titleEn: 'Projects',             titleEs: 'Proyectos',               translate: true  },
-      { key: 'courses',   file: 'courses.html',   titleEn: 'Courses',              titleEs: 'Cursos',                  translate: true  },
-      { key: 'thesis',    file: 'thesis.html',    titleEn: 'Thesis',               titleEs: 'Tesis',                   translate: true  },
-      { key: 'awards',    file: 'awards.html',    titleEn: 'Awards & acknowledgments', titleEs: 'Premios y reconocimientos', translate: true },
-      { key: 'congress',  file: 'congress.html',  titleEn: 'Congress',             titleEs: 'Congresos',               translate: false },
-      { key: 'papers',    file: 'papers.html',    titleEn: 'Papers',               titleEs: 'Publicaciones',           translate: false }
+      { key: 'education', file: 'education.html', titleEn: 'Education',               titleEs: 'Educación',                 translate: true  },
+      { key: 'work',      file: 'work.html',      titleEn: 'Work experience',         titleEs: 'Experiencia laboral',       translate: true  },
+      { key: 'projects',  file: 'projects.html',  titleEn: 'Projects',                titleEs: 'Proyectos',                 translate: true  },
+      { key: 'courses',   file: 'courses.html',   titleEn: 'Courses',                 titleEs: 'Cursos',                    translate: true  },
+      { key: 'thesis',    file: 'thesis.html',    titleEn: 'Thesis',                  titleEs: 'Tesis',                     translate: true  },
+      { key: 'awards',    file: 'awards.html',    titleEn: 'Awards & acknowledgments', titleEs: 'Premios y reconocimientos', translate: true  },
+      { key: 'congress',  file: 'congress.html',  titleEn: 'Congress',                titleEs: 'Congresos',                 translate: false },
+      { key: 'papers',    file: 'papers.html',    titleEn: 'Papers',                  titleEs: 'Publicaciones',             translate: false }
     ]
   };
 
@@ -42,6 +49,30 @@
   // ==========================================================================
   const translationCache = new Map();
   let isExporting = false;
+
+  // ==========================================================================
+  // CARGA DE LIBRERÍAS
+  // ==========================================================================
+  function loadScript(url) {
+    if (!url) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar ' + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function loadPdfLibraries() {
+    const tasks = [];
+    if (!window.pdfMake) tasks.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js'));
+    if (!window.pdfMake || !window.pdfMake.vfs) tasks.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js'));
+    if (!window.htmlToPdfmake) tasks.push(loadScript('https://cdn.jsdelivr.net/npm/html-to-pdfmake@2.5.4/browser.js'));
+    await Promise.all(tasks);
+    if (!window.pdfMake) throw new Error('pdfmake no se cargó correctamente');
+    if (!window.htmlToPdfmake) throw new Error('html-to-pdfmake no se cargó correctamente');
+  }
 
   // ==========================================================================
   // TRADUCCIÓN (MyMemory, gratuita, sin key)
@@ -70,7 +101,7 @@
       translationCache.set(key, result);
       return result;
     } catch {
-      translationCache.set(key, text); // cacheamos el fallback también
+      translationCache.set(key, text);
       return text;
     }
   }
@@ -78,7 +109,6 @@
   async function translateContainer(container, targetLang, onProgress) {
     if (targetLang === 'en') return;
 
-    // Recolecta todos los nodos de texto traducibles
     const textNodes = [];
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -126,10 +156,8 @@
   }
 
   // ==========================================================================
-  // EXTRACCIÓN DE CONTENIDO DEL DOM ACTUAL (index)
+  // EXTRACCIÓN DE CONTENIDO
   // ==========================================================================
-  // Devuelve el texto visible del elemento en el idioma pedido, eliminando
-  // los <span lang="xx"> que no correspondan.
   function pickLang(el, lang) {
     const clone = el.cloneNode(true);
     clone.querySelectorAll('[lang]').forEach(s => {
@@ -156,17 +184,35 @@
       if (!titleEl) return;
       const title = pickLang(titleEl, lang);
       const tLower = title.toLowerCase();
-      // Saltamos tarjetas irrelevantes para el PDF
+      // Excluidos del PDF: visitas y número de Erdős
       if (tLower.includes('visit')) return;
       if (tLower.includes('erd')) return;
-      if (tLower.includes('web')) return;
+      // "Web sites" SÍ se incluye (links clickables en el PDF)
 
       const items = [];
       card.querySelectorAll('li').forEach(li => {
         const link = li.querySelector('a[href]');
         const text = pickLang(li, lang);
         if (!text) return;
-        items.push(link ? { text, href: link.href } : { text });
+
+        let href = null;
+        if (link) {
+          const raw = (link.getAttribute('href') || '').trim();
+          if (raw && raw !== '#' && !raw.startsWith('javascript:')) {
+            href = link.href;
+          }
+        }
+        // Fallback: inferir mailto / WhatsApp si no hay href válido
+        if (!href) {
+          if (text.includes('@') && text.includes('.')) {
+            const m = text.match(/[\w.+-]+@[\w.-]+/);
+            if (m) href = 'mailto:' + m[0];
+          } else if (/\+?\d[\d\s]{6,}/.test(text)) {
+            const phone = text.replace(/[^\d]/g, '');
+            if (phone.length >= 8) href = 'https://wa.me/' + phone;
+          }
+        }
+        items.push(href ? { text, href } : { text });
       });
       if (items.length) cards.push({ title, items });
     });
@@ -179,7 +225,6 @@
   async function fetchDoc(file) {
     const candidates = [file, 'resources/' + file];
     if (file === 'courses.html') candidates.push('cources.html', 'resources/cources.html');
-
     for (const url of candidates) {
       try {
         const r = await fetch(url, { cache: 'no-cache' });
@@ -225,36 +270,280 @@
   }
 
   // ==========================================================================
-  // ESPERAR IMÁGENES
+  // RESOLUCIÓN DE RUTAS (funciona desde cualquier página del sitio)
   // ==========================================================================
-  function waitForImages(root, timeoutMs = 5000) {
-    const imgs = Array.from(root.querySelectorAll('img'));
-    if (!imgs.length) return Promise.resolve();
-    return Promise.all(imgs.map(img => new Promise(resolve => {
-      if (img.complete && img.naturalWidth > 0) return resolve();
-      const done = () => { img.onload = img.onerror = null; resolve(); };
-      img.onload = done;
-      img.onerror = done;
-      setTimeout(done, timeoutMs);
-    })));
+  function getAbsoluteUrl(path) {
+    try {
+      const script = document.querySelector('script[src*="cv-pdf"]');
+      if (script && script.src) {
+        const scriptUrl = new URL(script.src, document.baseURI);
+        const rootPath = scriptUrl.pathname.replace(/\/?js\/[^/]+$/, '/');
+        return scriptUrl.origin + rootPath + path.replace(/^\.?\/+/, '');
+      }
+    } catch (e) {}
+    try { return new URL(path, document.baseURI).href; }
+    catch (e) { return path; }
   }
 
   // ==========================================================================
-  // CONSTRUCCIÓN DEL HTML DEL CV
+  // IMÁGENES → DATA URL
   // ==========================================================================
-  async function buildCvRoot(lang, onProgress) {
-    const isEs = lang === 'es';
-    const root = document.createElement('div');
-    root.className = 'cv-root';
+  function loadImageAsDataURL(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0);
+          resolve(c.toDataURL('image/png'));
+        } catch (err) { reject(err); }
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+      img.src = src;
+    });
+  }
 
-    // ---------- Datos del index (perfil + sidebar) ----------
+  async function makeCircularPhoto(src) {
+    const dataURL = await loadImageAsDataURL(src);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 600;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+
+        const borderW = Math.round(size * 0.025);
+        const s = Math.min(img.naturalWidth, img.naturalHeight);
+
+        // Recorte circular
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - borderW, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        const sx = (img.naturalWidth - s) / 2;
+        const sy = (img.naturalHeight - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, borderW, borderW, size - 2 * borderW, size - 2 * borderW);
+        ctx.restore();
+
+        // Borde azul
+        ctx.strokeStyle = '#1e40af';
+        ctx.lineWidth = borderW;
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - borderW / 2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = dataURL;
+    });
+  }
+
+  // ==========================================================================
+  // BUILDERS pdfmake
+  // ==========================================================================
+  function sectionTitleBlock(text) {
+    return {
+      stack: [
+        { text, fontSize: 14, bold: true, color: '#1e3a8a' },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1.5, lineColor: '#f59e0b' }] }
+      ],
+      margin: [0, 14, 0, 8]
+    };
+  }
+
+  function buildHeaderPdf(lang, photoDataURL, qrDataURL) {
+    const isEs = lang === 'es';
+    const dateStr = new Date().toLocaleDateString(
+      isEs ? 'es-ES' : 'en-GB',
+      { day: 'numeric', month: 'long', year: 'numeric' }
+    );
+
+    const columns = [];
+
+    columns.push(photoDataURL
+      ? { image: photoDataURL, fit: [90, 90], width: 90, alignment: 'center' }
+      : { text: '', width: 90 });
+
+    columns.push({
+      stack: [
+        { text: CONFIG.name, fontSize: 22, bold: true, color: '#1e3a8a', alignment: 'center' },
+        { text: CONFIG.title, fontSize: 11, bold: true, color: '#1e40af', alignment: 'center', margin: [0, 2, 0, 0] },
+        { text: CONFIG.cvLabel, fontSize: 9, color: '#64748b', alignment: 'center', margin: [0, 2, 0, 0] },
+        { text: (isEs ? 'Actualizado: ' : 'Updated: ') + dateStr, fontSize: 8.5, color: '#64748b', alignment: 'center', margin: [0, 4, 0, 0] }
+      ],
+      width: '*',
+      margin: [10, 22, 10, 0],
+      alignment: 'center'
+    });
+
+    columns.push(qrDataURL
+      ? { image: qrDataURL, fit: [80, 80], width: 80, alignment: 'center', margin: [0, 10, 0, 0] }
+      : { text: '', width: 80 });
+
+    return {
+      stack: [
+        { columns, columnGap: 10 },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1e40af' }], margin: [0, 12, 0, 0] }
+      ],
+      margin: [0, 0, 0, 10]
+    };
+  }
+
+  function buildProfilePdf(profile, lang) {
+    if (!profile.length) return [];
+    const isEs = lang === 'es';
+    return [
+      sectionTitleBlock(isEs ? 'Perfil profesional' : 'Professional profile'),
+      { text: profile.join('\n\n'), fontSize: 9.5, alignment: 'justify', lineHeight: 1.4 }
+    ];
+  }
+
+  function buildSidebarPdf(sidebar, lang) {
+    if (!sidebar.length) return [];
+    const isEs = lang === 'es';
+
+    // Dividir en 2 columnas equilibradas
+    const mid = Math.ceil(sidebar.length / 2);
+    const left = sidebar.slice(0, mid);
+    const right = sidebar.slice(mid);
+
+    const buildColumn = (cards) => {
+      const stack = [];
+      cards.forEach(card => {
+        stack.push({
+          text: card.title,
+          fontSize: 10,
+          bold: true,
+          color: '#1e40af',
+          margin: [0, 6, 0, 3]
+        });
+        card.items.forEach(it => {
+          if (it.href) {
+            stack.push({
+              text: '•  ' + it.text,
+              link: it.href,
+              color: '#1e40af',
+              fontSize: 9,
+              decoration: 'underline',
+              margin: [6, 1, 0, 1]
+            });
+          } else {
+            stack.push({
+              text: '•  ' + it.text,
+              fontSize: 9,
+              margin: [6, 1, 0, 1]
+            });
+          }
+        });
+      });
+      return { stack, width: '*' };
+    };
+
+    return [
+      sectionTitleBlock(isEs ? 'Datos profesionales y personales' : 'Professional & personal details'),
+      {
+        columns: [buildColumn(left), buildColumn(right)],
+        columnGap: 16
+      }
+    ];
+  }
+
+  function buildSectionPdf(section, translatedEntries, lang) {
+    const isEs = lang === 'es';
+    if (!translatedEntries.length) return null;
+
+    const out = [sectionTitleBlock(isEs ? section.titleEs : section.titleEn)];
+    let currentGroup = null;
+
+    for (const entry of translatedEntries) {
+      if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
+        currentGroup = entry.sectionGroup;
+        out.push({
+          text: currentGroup,
+          fontSize: 11,
+          bold: true,
+          color: '#1e40af',
+          margin: [0, 8, 0, 4]
+        });
+      }
+
+      let bodyContent;
+      try {
+        bodyContent = window.htmlToPdfmake(entry.dom.innerHTML, {
+          window: window,
+          defaultStyles: {
+            a: { color: '#1e40af', decoration: 'underline' },
+            strong: { bold: true },
+            b: { bold: true },
+            em: { italics: true },
+            i: { italics: true }
+          }
+        });
+        if (!Array.isArray(bodyContent)) bodyContent = [bodyContent];
+      } catch (e) {
+        console.warn('[cv-pdf] html-to-pdfmake falló:', e.message);
+        bodyContent = [{ text: entry.dom.textContent, fontSize: 9 }];
+      }
+
+      bodyContent = bodyContent.filter(n => n != null && n !== '');
+
+      out.push({
+        columns: [
+          {
+            text: entry.year || '',
+            width: 78,
+            bold: true,
+            color: '#1e40af',
+            fontSize: 9,
+            alignment: 'left'
+          },
+          {
+            stack: bodyContent,
+            width: '*',
+            fontSize: 9,
+            alignment: 'left'
+          }
+        ],
+        columnGap: 10,
+        margin: [0, 4, 0, 4]
+      });
+    }
+
+    return out;
+  }
+
+  // ==========================================================================
+  // GENERACIÓN DEL PDF
+  // ==========================================================================
+  async function generatePdf(lang, onProgress) {
+    const isEs = lang === 'es';
+
+    // 1. Cargar librerías
+    await loadPdfLibraries();
+
+    // 2. Cargar imágenes (resolviendo rutas absolutas → funciona desde cualquier página)
+    let photoDataURL = null;
+    let qrDataURL = null;
+    try { photoDataURL = await makeCircularPhoto(getAbsoluteUrl(CONFIG.photo)); }
+    catch (e) { console.warn('[cv-pdf] Foto no cargada:', e.message); }
+    try { qrDataURL = await loadImageAsDataURL(getAbsoluteUrl(CONFIG.qr)); }
+    catch (e) { console.warn('[cv-pdf] QR no cargado:', e.message); }
+
+    // 3. Datos del index (perfil + sidebar)
     let profile, sidebar;
     if (document.querySelector('.about-text') && document.querySelector('aside .card')) {
-      // Estamos en index.html → usar DOM local (más rápido y fiable)
       profile = extractProfileFromDoc(document, lang);
       sidebar = extractSidebarFromDoc(document, lang);
     } else {
-      // Estamos en otra página → fetch de index.html
       try {
         const idxDoc = await fetchIndexDoc();
         profile = extractProfileFromDoc(idxDoc, lang);
@@ -265,84 +554,18 @@
       }
     }
 
-    // ---------- CABECERA ----------
-    const dateStr = new Date().toLocaleDateString(
-      isEs ? 'es-ES' : 'en-GB',
-      { day: 'numeric', month: 'long', year: 'numeric' }
-    );
-    const header = document.createElement('header');
-    header.className = 'cv-header';
-    header.dataset.noTranslate = 'true'; // ya construido en idioma correcto
-    header.innerHTML = `
-      <div class="cv-header-left">
-        <img src="${CONFIG.photo}" alt="Photo" class="cv-photo">
-      </div>
-      <div class="cv-header-center">
-        <h1 class="cv-name">${CONFIG.name}</h1>
-        <p class="cv-title">${CONFIG.title}</p>
-        <p class="cv-label">${CONFIG.cvLabel}</p>
-        <p class="cv-date">${isEs ? 'Actualizado' : 'Updated'}: ${dateStr}</p>
-      </div>
-      <div class="cv-header-right">
-        <img src="${CONFIG.qr}" alt="QR" class="cv-qr">
-      </div>
-    `;
-    root.appendChild(header);
+    // 4. Construir contenido del PDF
+    const content = [];
+    content.push(buildHeaderPdf(lang, photoDataURL, qrDataURL));
+    content.push(...buildProfilePdf(profile, lang));
+    content.push(...buildSidebarPdf(sidebar, lang));
 
-    // ---------- PERFIL ----------
-    if (profile.length) {
-      const sec = document.createElement('section');
-      sec.className = 'cv-section';
-      sec.dataset.noTranslate = 'true'; // ya viene en el idioma correcto
-      sec.innerHTML = `<h2 class="cv-section-title">${isEs ? 'Perfil profesional' : 'Professional profile'}</h2>`;
-      profile.forEach(text => {
-        const p = document.createElement('p');
-        p.textContent = text;
-        sec.appendChild(p);
-      });
-      root.appendChild(sec);
-    }
-
-    // ---------- SIDEBAR ----------
-    if (sidebar.length) {
-      const sec = document.createElement('section');
-      sec.className = 'cv-section';
-      sec.dataset.noTranslate = 'true';
-      sec.innerHTML = `<h2 class="cv-section-title">${isEs ? 'Datos profesionales y personales' : 'Professional & personal details'}</h2>`;
-      const grid = document.createElement('div');
-      grid.className = 'cv-sidebar-grid';
-      sidebar.forEach(card => {
-        const col = document.createElement('div');
-        col.className = 'cv-sidebar-col';
-        const h = document.createElement('h3');
-        h.textContent = card.title;
-        col.appendChild(h);
-        const ul = document.createElement('ul');
-        card.items.forEach(item => {
-          const li = document.createElement('li');
-          if (item.href) {
-            const a = document.createElement('a');
-            a.href = item.href;
-            a.textContent = item.text;
-            li.appendChild(a);
-          } else {
-            li.textContent = item.text;
-          }
-          ul.appendChild(li);
-        });
-        col.appendChild(ul);
-        grid.appendChild(col);
-      });
-      sec.appendChild(grid);
-      root.appendChild(sec);
-    }
-
-    // ---------- SECCIONES (fetch + parseo) ----------
+    // 5. Procesar secciones (fetch → translate → build)
     const totalSections = CONFIG.sections.length;
-    const translatableSectionEls = [];
 
     for (let i = 0; i < totalSections; i++) {
       const s = CONFIG.sections[i];
+
       if (onProgress) onProgress({
         phase: 'fetch',
         current: i + 1,
@@ -350,215 +573,92 @@
         label: isEs ? s.titleEs : s.titleEn
       });
 
-      const sec = document.createElement('section');
-      sec.className = 'cv-section';
-
+      let doc;
       try {
-        const doc = await fetchDoc(s.file);
-        const entries = parseEntries(doc);
-        if (!entries.length) continue;
-
-        const title = isEs ? s.titleEs : s.titleEn;
-        sec.innerHTML = `<h2 class="cv-section-title" data-no-translate="true">${title}</h2>`;
-        const list = document.createElement('div');
-        list.className = 'cv-entries';
-
-        let currentGroup = null;
-        entries.forEach(entry => {
-          if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
-            currentGroup = entry.sectionGroup;
-            const groupH = document.createElement('h3');
-            groupH.className = 'cv-subsection-title';
-            groupH.textContent = entry.sectionGroup;
-            if (!s.translate) groupH.dataset.noTranslate = 'true';
-            list.appendChild(groupH);
-          }
-          const el = document.createElement('div');
-          el.className = 'cv-entry';
-          if (!s.translate) el.dataset.noTranslate = 'true';
-          el.innerHTML = `
-            <div class="cv-entry-year">${entry.year || ''}</div>
-            <div class="cv-entry-body">${entry.html}</div>
-          `;
-          list.appendChild(el);
-        });
-
-        sec.appendChild(list);
-        root.appendChild(sec);
-
-        if (s.translate) translatableSectionEls.push(sec);
+        doc = await fetchDoc(s.file);
       } catch (err) {
-        console.warn('[cv-pdf] Error cargando ' + s.file, err);
-        const title = isEs ? s.titleEs : s.titleEn;
-        sec.innerHTML = `
-          <h2 class="cv-section-title" data-no-translate="true">${title}</h2>
-          <p style="color:#94a3b8;font-style:italic;font-size:9pt;">
-            (${isEs ? 'Sección no disponible' : 'Section not available'})
-          </p>
-        `;
-        root.appendChild(sec);
+        console.warn('[cv-pdf] Error cargando ' + s.file + ':', err.message);
+        continue;
       }
+
+      const entries = parseEntries(doc);
+      if (!entries.length) continue;
+
+      // Preparar DOM traducido por entrada
+      const translatedEntries = [];
+      for (const entry of entries) {
+        const temp = document.createElement('div');
+        temp.innerHTML = entry.html;
+        if (isEs && s.translate) {
+          await translateContainer(temp, lang, (done, total) => {
+            if (onProgress) onProgress({ phase: 'translate', current: done, total });
+          });
+        }
+        translatedEntries.push({
+          year: entry.year,
+          dom: temp,
+          sectionGroup: entry.sectionGroup
+        });
+      }
+
+      const sectionContent = buildSectionPdf(s, translatedEntries, lang);
+      if (sectionContent) content.push(...sectionContent);
     }
 
-    // ---------- TRADUCCIÓN (solo secciones marcadas) ----------
-    if (lang !== 'en' && translatableSectionEls.length) {
-      if (onProgress) onProgress({ phase: 'translate', current: 0, total: 0 });
+    // 6. Definición final del documento
+    const docDef = {
+      pageSize: 'A4',
+      pageMargins: [15, 20, 15, 22],
+      content,
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 10,
+        color: '#1e293b'
+      },
+      footer: function (currentPage, pageCount) {
+        return {
+          columns: [
+            {
+              text: CONFIG.website,
+              link: CONFIG.website,
+              alignment: 'left',
+              fontSize: 8,
+              color: '#64748b'
+            },
+            {
+              text: currentPage + ' / ' + pageCount,
+              alignment: 'right',
+              fontSize: 8,
+              color: '#64748b'
+            }
+          ],
+          margin: [15, 0, 15, 10]
+        };
+      }
+    };
 
-      // Ejecutamos todas las secciones traducibles en paralelo
-      await Promise.all(translatableSectionEls.map(secEl =>
-        translateContainer(secEl, lang, (done, total) => {
-          if (onProgress) onProgress({ phase: 'translate', current: done, total });
-        })
-      ));
-    }
-
-    // ---------- PIE ----------
-    const footer = document.createElement('footer');
-    footer.className = 'cv-footer';
-    footer.dataset.noTranslate = 'true';
-    footer.textContent = CONFIG.website;
-    root.appendChild(footer);
-
-    return root;
+    // 7. Generar y descargar
+    const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
+    return new Promise((resolve, reject) => {
+      try {
+        window.pdfMake.createPdf(docDef).download(filename, () => {
+          console.log('[cv-pdf] ✓ PDF generado:', filename);
+          resolve();
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 
   // ==========================================================================
-  // ESTILOS (del PDF + de la UI del menú)
+  // ESTILOS (solo UI del menú, inyectados una sola vez)
   // ==========================================================================
   function injectStyles() {
     if (document.getElementById('cv-pdf-styles')) return;
     const style = document.createElement('style');
     style.id = 'cv-pdf-styles';
     style.textContent = `
-      #cv-pdf-mount,
-#cv-pdf-mount *,
-.cv-root,
-.cv-root * {
-  overflow: visible !important;
-  float: none !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  animation: none !important;
-  transition: none !important;
-}
-      .cv-root {
-        font-family: 'Inter', Arial, Helvetica, sans-serif;
-        font-size: 10pt;
-        color: #1e293b;
-        line-height: 1.5;
-        background: #ffffff;
-        padding: 0;
-      }
-
-      /* Cabecera */
-      .cv-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding-bottom: 14px;
-        border-bottom: 3px solid #1e40af;
-        margin-bottom: 18px;
-      }
-      .cv-header-left, .cv-header-right { flex: 0 0 auto; }
-      .cv-header-center { flex: 1 1 auto; text-align: center; padding: 0 10px; }
-      .cv-photo {
-        width: 120px; height: 120px;
-        border-radius: 50%;
-        border: 3px solid #1e40af;
-        object-fit: cover;
-        display: block;
-      }
-      .cv-qr {
-        width: 90px; height: 90px;
-        object-fit: contain;
-        display: block;
-      }
-      .cv-name {
-        font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-        font-size: 22pt; font-weight: 700;
-        color: #1e3a8a;
-        margin: 0 0 4px 0; line-height: 1.15;
-      }
-      .cv-title {
-        font-size: 11pt; font-weight: 600;
-        color: #1e40af; margin: 0 0 2px 0;
-      }
-      .cv-label {
-        font-size: 9pt; color: #64748b;
-        text-transform: uppercase; letter-spacing: 0.15em;
-        margin: 2px 0;
-      }
-      .cv-date { font-size: 8.5pt; color: #64748b; margin: 0; }
-
-      /* Secciones */
-      .cv-section { margin-bottom: 16px; }
-      .cv-section-title {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 13.5pt; font-weight: 700;
-        color: #1e3a8a;
-        border-bottom: 2px solid #f59e0b;
-        padding-bottom: 3px; margin: 0 0 10px 0;
-      }
-      .cv-section p {
-        margin: 0 0 8px 0;
-        text-align: justify;
-        font-size: 9.5pt; line-height: 1.55;
-      }
-      .cv-subsection-title {
-        font-size: 10.5pt; font-weight: 700;
-        color: #1e40af;
-        margin: 10px 0 6px 0; padding-bottom: 2px;
-        border-bottom: 1px dashed #cbd5e1;
-      }
-
-      /* Grid de sidebar */
-      .cv-sidebar-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
-      }
-      .cv-sidebar-col h3 {
-        font-size: 10pt; font-weight: 700;
-        color: #1e40af; margin: 0 0 4px 0;
-      }
-      .cv-sidebar-col ul { list-style: disc; padding-left: 14px; margin: 0; }
-      .cv-sidebar-col li {
-        font-size: 9pt; margin-bottom: 2px; line-height: 1.4;
-        overflow-wrap: anywhere;
-      }
-      .cv-sidebar-col a { color: #1e40af; text-decoration: none; }
-
-      /* Entradas (dos columnas: año | cuerpo) */
-      .cv-entry {
-        display: grid;
-        grid-template-columns: 90px 1fr;
-        gap: 12px;
-        padding: 6px 0;
-        border-bottom: 1px solid #e2e8f0;
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
-      .cv-entry:last-child { border-bottom: none; }
-      .cv-entry-year {
-        font-weight: 700; font-size: 9pt;
-        color: #1e40af; line-height: 1.4;
-      }
-      .cv-entry-body {
-        font-size: 9.5pt; line-height: 1.5;
-        overflow-wrap: anywhere;
-      }
-      .cv-entry-body strong { color: #1e3a8a; }
-      .cv-entry-body em { color: #475569; }
-      .cv-entry-body a {
-        color: #1e40af; text-decoration: none;
-        font-size: 8.5pt; font-weight: 600;
-      }
-      .cv-footer {
-        margin-top: 20px; padding-top: 8px;
-        border-top: 1px solid #cbd5e1;
-        text-align: center; font-size: 8pt; color: #64748b;
-      }
-
-      /* ============ UI DEL MENÚ ============ */
       .cv-pdf-box {
         padding: 10px 12px;
         background: #f8fafc;
@@ -601,228 +701,13 @@
       .cv-pdf-status.show { display: block; }
       .cv-pdf-status.error { color: #dc2626; }
 
-      /* ============ OVERLAY / SPINNER ============ */
-      #cv-pdf-overlay {
-        position: fixed; inset: 0;
-        background: rgba(248, 250, 252, 0.96);
-        -webkit-backdrop-filter: blur(4px);
-        backdrop-filter: blur(4px);
-        z-index: 99999;
-        display: flex; align-items: center; justify-content: center;
-        font-family: 'Inter', -apple-system, sans-serif;
-      }
-      #cv-pdf-overlay .cv-pdf-spinner {
-        width: 44px; height: 44px;
-        border: 4px solid #e2e8f0;
-        border-top-color: #1e40af;
-        border-radius: 50%;
-        animation: cvpdf-spin 1s linear infinite;
-        margin: 0 auto 14px;
-      }
-      #cv-pdf-overlay .cv-pdf-overlay-text {
-        font-size: 15px; font-weight: 600; color: #1e40af;
-        text-align: center; padding: 0 20px;
-      }
-      @keyframes cvpdf-spin { to { transform: rotate(360deg); } }
-
       @media print {
-        .cv-pdf-box, #cv-pdf-overlay { display: none !important; }
+        .cv-pdf-box { display: none !important; }
       }
     `;
     document.head.appendChild(style);
   }
 
-  // ==========================================================================
-// HELPERS nuevos
-// ==========================================================================
-function loadScript(url) {
-  if (!url) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = url;
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('No se pudo cargar ' + url));
-    document.head.appendChild(s);
-  });
-}
-
-function createToast(message) {
-  const t = document.createElement('div');
-  t.style.cssText = `
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: #1e40af; color: #fff; padding: 12px 24px;
-    border-radius: 8px; font: 600 14px/1.4 'Inter', sans-serif;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25); z-index: 2147483647;
-    max-width: 90vw; text-align: center;
-  `;
-  t.textContent = message;
-  return t;
-}
-   
-// ==========================================================================
-// GENERACIÓN DEL PDF (html2canvas + jsPDF, con troceado por página)
-// ==========================================================================
-async function generatePdf(lang, onProgress) {
-  await Promise.all([
-    window.html2canvas
-      ? null
-      : loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
-    (window.jspdf && window.jspdf.jsPDF)
-      ? null
-      : loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-  ]);
-
-  injectStyles();
-  const cvRoot = await buildCvRoot(lang, onProgress);
-
-  // ★ Convertir imágenes a data URL ANTES de capturar (arregla el QR)
-  await convertImagesToDataURLs(cvRoot);
-
-  const toast = createToast(lang === 'es' ? 'Generando PDF…' : 'Generating PDF…');
-  document.body.appendChild(toast);
-
-  const mount = document.createElement('div');
-  mount.id = 'cv-pdf-mount';
-  mount.style.cssText = `
-    position: fixed;
-    top: 0; left: 0;
-    width: 794px;
-    background: #ffffff;
-    z-index: 999998;
-    margin: 0; padding: 0;
-    overflow: visible;
-    pointer-events: none;
-    box-shadow: 0 0 40px rgba(0,0,0,0.15);
-  `;
-  mount.appendChild(cvRoot);
-  document.body.appendChild(mount);
-
-  try {
-    await waitForImages(cvRoot, 15000);
-    await new Promise(r => setTimeout(r, 400));
-
-    // ★ Diagnóstico de imágenes (deja rastro en consola)
-    cvRoot.querySelectorAll('img').forEach(img => {
-      console.log('[cv-pdf] Img:', {
-        src: img.src.slice(0, 60),
-        complete: img.complete,
-        natural: img.naturalWidth + '×' + img.naturalHeight,
-        isDataURL: img.src.startsWith('data:')
-      });
-    });
-
-    const rect = mount.getBoundingClientRect();
-    console.log('[cv-pdf] Mount:', Math.round(rect.width) + '×' + Math.round(rect.height));
-
-    if (rect.height < 100) {
-      throw new Error('El CV no tiene contenido (altura ' + rect.height + 'px).');
-    }
-
-    // ★ Escala adaptativa: 3 si el CV es corto, 2 si es largo (límite canvas ≈ 32 000 px)
-    const MAX_CANVAS_PX = 32000;
-    const maxScaleByHeight = Math.floor(MAX_CANVAS_PX / rect.height);
-    const scale = Math.max(2, Math.min(3, maxScaleByHeight));
-    console.log('[cv-pdf] Usando scale:', scale);
-
-    const canvas = await window.html2canvas(mount, {
-      scale: scale,                    // ★ más DPI real
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      foreignObjectRendering: false,
-      removeContainer: true,
-      imageTimeout: 20000,
-      scrollX: 0,
-      scrollY: 0
-    });
-    console.log('[cv-pdf] Canvas:', canvas.width + '×' + canvas.height);
-
-    if (!canvas.width || !canvas.height) throw new Error('Canvas vacío (0×0).');
-
-    // ★ PDF con márgenes fijos y troceado por página
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-
-    const pageW = pdf.internal.pageSize.getWidth();   // 210
-    const pageH = pdf.internal.pageSize.getHeight();  // 297
-    const mTop = 15, mBottom = 15, mLeft = 15, mRight = 15;
-    const contentW = pageW - mLeft - mRight;          // 180
-    const contentH = pageH - mTop - mBottom;          // 267
-
-    const pxPerMM = canvas.width / contentW;
-    const pageContentHeightPx = Math.floor(contentH * pxPerMM);
-    const totalPages = Math.ceil(canvas.height / pageContentHeightPx);
-    console.log('[cv-pdf] Páginas a generar:', totalPages);
-
-    for (let i = 0; i < totalPages; i++) {
-      const sourceY = i * pageContentHeightPx;
-      const sourceH = Math.min(pageContentHeightPx, canvas.height - sourceY);
-
-      // Trocear el canvas
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width;
-      slice.height = sourceH;
-      const ctx = slice.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, slice.width, sourceH);
-      ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
-
-      const sliceData = slice.toDataURL('image/jpeg', 0.98);
-      const sliceH_MM = (sourceH * contentW) / canvas.width;
-
-      if (i > 0) pdf.addPage();
-      // ★ 'NONE' evita que jsPDF recomprima el JPEG (causa del pixelado)
-      pdf.addImage(sliceData, 'JPEG', mLeft, mTop, contentW, sliceH_MM, undefined, 'NONE');
-    }
-
-    pdf.save(`CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`);
-    console.log('[cv-pdf] ✓ PDF guardado:', totalPages, 'páginas');
-
-  } finally {
-    if (toast.parentNode) document.body.removeChild(toast);
-    if (mount.parentNode) document.body.removeChild(mount);
-  }
-}
-
-   // ==========================================================================
-// CONVERSIÓN DE IMÁGENES A DATA URL (arregla QR y cualquier imagen)
-// ==========================================================================
-async function convertImagesToDataURLs(root) {
-  const imgs = Array.from(root.querySelectorAll('img'));
-  for (const img of imgs) {
-    const src = img.getAttribute('src');
-    if (!src || src.startsWith('data:')) continue;
-    try {
-      const absSrc = new URL(src, document.baseURI).href;
-      const dataURL = await loadImageAsDataURL(absSrc);
-      img.src = dataURL;
-      console.log('[cv-pdf] Imagen convertida a dataURL:', src);
-    } catch (e) {
-      console.warn('[cv-pdf] No se pudo convertir:', src, '→', e.message);
-    }
-  }
-}
-
-function loadImageAsDataURL(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        c.getContext('2d').drawImage(img, 0, 0);
-        resolve(c.toDataURL('image/jpeg', 0.98));
-      } catch (err) {
-        reject(err);
-      }
-    };
-    img.onerror = () => reject(new Error('No se pudo cargar: ' + src));
-    img.src = src;
-  });
-}
-   
   // ==========================================================================
   // UI: PANEL EN EL MENÚ
   // ==========================================================================
@@ -830,6 +715,8 @@ function loadImageAsDataURL(src) {
     const dropdown = document.querySelector('.nav-dropdown');
     if (!dropdown) return;
     if (document.getElementById('cv-pdf-li')) return;
+
+    injectStyles();
 
     const li = document.createElement('li');
     li.id = 'cv-pdf-li';
@@ -863,18 +750,12 @@ function loadImageAsDataURL(src) {
     const btn = li.querySelector('.cv-pdf-export');
     const statusEl = li.querySelector('.cv-pdf-status');
 
-    // Inicializa con el idioma actual del sitio
     select.value = (document.documentElement.getAttribute('data-lang') === 'es') ? 'es' : 'en';
 
     function setStatus(text, isError) {
       statusEl.textContent = text || '';
       statusEl.classList.toggle('show', !!text);
       statusEl.classList.toggle('error', !!isError);
-    }
-
-    function setOverlayText(text) {
-      const t = document.getElementById('cvpdf-overlay-text');
-      if (t) t.textContent = text;
     }
 
     btn.addEventListener('click', async () => {
@@ -886,22 +767,17 @@ function loadImageAsDataURL(src) {
       const lang = select.value === 'es' ? 'es' : 'en';
       const isEs = lang === 'es';
 
-      // Cierra el menú
       const navDropdown = document.querySelector('.nav-dropdown');
       if (navDropdown) navDropdown.classList.remove('open');
 
       const onProgress = (info) => {
         if (info.phase === 'fetch') {
-          const msg = (isEs ? 'Cargando ' : 'Loading ') + info.label +
-                      ' (' + info.current + '/' + info.total + ')';
-          setStatus(msg);
-          setOverlayText(msg);
+          setStatus((isEs ? 'Cargando ' : 'Loading ') + info.label + ' (' + info.current + '/' + info.total + ')');
         } else if (info.phase === 'translate') {
           const msg = (info.total > 0)
             ? (isEs ? 'Traduciendo… ' : 'Translating… ') + info.current + '/' + info.total
             : (isEs ? 'Traduciendo…' : 'Translating…');
           setStatus(msg);
-          setOverlayText(msg);
         }
       };
 
