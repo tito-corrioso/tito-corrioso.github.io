@@ -481,68 +481,90 @@
   }
 
   function buildSectionPdf(section, translatedEntries, lang) {
-    const isEs = lang === 'es';
-    if (!translatedEntries.length) return null;
+  const isEs = lang === 'es';
+  if (!translatedEntries.length) return null;
 
-    const out = [sectionTitleBlock(isEs ? section.titleEs : section.titleEn)];
-    let currentGroup = null;
+  const out = [sectionTitleBlock(isEs ? section.titleEs : section.titleEn)];
+  let currentGroup = null;
+  let ok = 0, skipped = 0;
 
-    for (const entry of translatedEntries) {
-      if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
-        currentGroup = entry.sectionGroup;
-        out.push({
-          text: currentGroup,
-          fontSize: 11,
-          bold: true,
-          color: '#1e40af',
-          margin: [0, 8, 0, 4]
-        });
-      }
-
-      let bodyContent;
-      try {
-        bodyContent = window.htmlToPdfmake(entry.dom.innerHTML, {
-          window: window,
-          defaultStyles: {
-            a: { color: '#1e40af', decoration: 'underline' },
-            strong: { bold: true },
-            b: { bold: true },
-            em: { italics: true },
-            i: { italics: true }
-          }
-        });
-        if (!Array.isArray(bodyContent)) bodyContent = [bodyContent];
-      } catch (e) {
-        console.warn('[cv-pdf] html-to-pdfmake falló:', e.message);
-        bodyContent = [{ text: entry.dom.textContent, fontSize: 9 }];
-      }
-
-      bodyContent = bodyContent.filter(n => n != null && n !== '');
-
+  for (const entry of translatedEntries) {
+    if (entry.sectionGroup && entry.sectionGroup !== currentGroup) {
+      currentGroup = entry.sectionGroup;
       out.push({
-        columns: [
-          {
-            text: entry.year || '',
-            width: 78,
-            bold: true,
-            color: '#1e40af',
-            fontSize: 9,
-            alignment: 'left'
-          },
-          {
-            stack: bodyContent,
-            width: '*',
-            fontSize: 9,
-            alignment: 'left'
-          }
-        ],
-        columnGap: 10,
-        margin: [0, 4, 0, 4]
+        text: currentGroup,
+        fontSize: 11,
+        bold: true,
+        color: '#1e40af',
+        margin: [0, 8, 0, 4]
       });
     }
 
-    return out;
+    let bodyContent;
+    try {
+      const cleanHtml = sanitizeEntryHtml(entry.dom.innerHTML);
+      bodyContent = window.htmlToPdfmake(cleanHtml, {
+        window: window,
+        defaultStyles: {
+          a: { color: '#1e40af', decoration: 'underline' },
+          strong: { bold: true },
+          b: { bold: true },
+          em: { italics: true },
+          i: { italics: true }
+        }
+      });
+      if (!Array.isArray(bodyContent)) bodyContent = [bodyContent];
+      // Filtrar nodos vacíos / nulos recursivamente
+      bodyContent = bodyContent
+        .filter(n => n != null && n !== '')
+        .map(n => {
+          if (typeof n === 'object' && n.stack) {
+            n.stack = n.stack.filter(x => x != null && x !== '');
+          }
+          return n;
+        });
+    } catch (e) {
+      console.warn('[cv-pdf] htmlToPdfmake falló para entrada ' + (entry.year || '?') + ':', e.message);
+      bodyContent = [];
+    }
+
+    // Fallback: si el HTML no se pudo convertir, usar texto plano
+    if (!bodyContent.length) {
+      const plain = (entry.dom.textContent || '').replace(/\s+/g, ' ').trim();
+      if (plain) {
+        bodyContent = [{ text: plain.substring(0, 2000), fontSize: 9 }];
+      } else {
+        skipped++;
+        continue;
+      }
+    }
+
+    out.push({
+      columns: [
+        {
+          text: entry.year || '',
+          width: 78,
+          bold: true,
+          color: '#1e40af',
+          fontSize: 9,
+          alignment: 'left'
+        },
+        {
+          stack: bodyContent,
+          width: '*',
+          fontSize: 9,
+          alignment: 'left'
+        }
+      ],
+      columnGap: 10,
+      margin: [0, 4, 0, 4]
+    });
+    ok++;
   }
+
+  console.log('[cv-pdf] ' + section.key + ': ' + ok + ' ok, ' + skipped + ' omitidas');
+  return out.length > 1 ? out : null;
+}
 
   // ==========================================================================
   // GENERACIÓN DEL PDF
