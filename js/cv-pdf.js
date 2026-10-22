@@ -658,12 +658,11 @@ function createToast(message) {
   t.textContent = message;
   return t;
 }
-
+   
 // ==========================================================================
-// GENERACIÓN DEL PDF (html2canvas + jsPDF, sin html2pdf)
+// GENERACIÓN DEL PDF (html2canvas + jsPDF, con troceado por página)
 // ==========================================================================
 async function generatePdf(lang, onProgress) {
-  // 1. Cargar librerías por separado (solo si no están ya cargadas)
   await Promise.all([
     window.html2canvas
       ? null
@@ -674,26 +673,23 @@ async function generatePdf(lang, onProgress) {
   ]);
 
   injectStyles();
-
-  // 2. Construir el DOM del CV (esto ya lo hacía buildCvRoot)
   const cvRoot = await buildCvRoot(lang, onProgress);
 
-  // 3. Toast (mensaje abajo al centro, NO cubre el contenido)
+  // ★ Convertir imágenes a data URL ANTES de capturar (arregla el QR)
+  await convertImagesToDataURLs(cvRoot);
+
   const toast = createToast(lang === 'es' ? 'Generando PDF…' : 'Generating PDF…');
   document.body.appendChild(toast);
 
-  // 4. Montar el CV VISIBLE en pantalla, esquina superior izquierda
   const mount = document.createElement('div');
   mount.id = 'cv-pdf-mount';
   mount.style.cssText = `
     position: fixed;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 794px;
     background: #ffffff;
     z-index: 999998;
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     overflow: visible;
     pointer-events: none;
     box-shadow: 0 0 40px rgba(0,0,0,0.15);
@@ -702,109 +698,129 @@ async function generatePdf(lang, onProgress) {
   document.body.appendChild(mount);
 
   try {
-    // 5. Esperar imágenes + un margen para el layout
-    await waitForImages(cvRoot, 10000);
+    await waitForImages(cvRoot, 15000);
     await new Promise(r => setTimeout(r, 400));
 
-    // 6. Diagnóstico en consola (nos dirá si algo falla)
+    // ★ Diagnóstico de imágenes (deja rastro en consola)
+    cvRoot.querySelectorAll('img').forEach(img => {
+      console.log('[cv-pdf] Img:', {
+        src: img.src.slice(0, 60),
+        complete: img.complete,
+        natural: img.naturalWidth + '×' + img.naturalHeight,
+        isDataURL: img.src.startsWith('data:')
+      });
+    });
+
     const rect = mount.getBoundingClientRect();
-    const diagnostics = {
-      mountWidth: Math.round(rect.width),
-      mountHeight: Math.round(rect.height),
-      childNodes: mount.querySelectorAll('*').length,
-      textLength: mount.textContent.trim().length
-    };
-    console.log('[cv-pdf] Diagnóstico:', diagnostics);
+    console.log('[cv-pdf] Mount:', Math.round(rect.width) + '×' + Math.round(rect.height));
 
-    if (diagnostics.mountHeight < 100) {
-      throw new Error(
-        'El contenido del CV tiene solo ' + diagnostics.mountHeight + 'px de alto. ' +
-        'buildCvRoot() no generó contenido — revisa los errores de fetch en la consola.'
-      );
-    }
-    if (diagnostics.textLength < 100) {
-      throw new Error(
-        'El CV tiene solo ' + diagnostics.textLength + ' caracteres. ' +
-        'Probablemente las secciones fallaron al cargarse.'
-      );
+    if (rect.height < 100) {
+      throw new Error('El CV no tiene contenido (altura ' + rect.height + 'px).');
     }
 
-    // 7. Capturar con html2canvas directamente
+    // ★ Escala adaptativa: 3 si el CV es corto, 2 si es largo (límite canvas ≈ 32 000 px)
+    const MAX_CANVAS_PX = 32000;
+    const maxScaleByHeight = Math.floor(MAX_CANVAS_PX / rect.height);
+    const scale = Math.max(2, Math.min(3, maxScaleByHeight));
+    console.log('[cv-pdf] Usando scale:', scale);
+
     const canvas = await window.html2canvas(mount, {
-      scale: 2,
+      scale: scale,                    // ★ más DPI real
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
       foreignObjectRendering: false,
       removeContainer: true,
-      imageTimeout: 15000,
+      imageTimeout: 20000,
       scrollX: 0,
       scrollY: 0
     });
-    console.log('[cv-pdf] Canvas capturado:', canvas.width, '×', canvas.height);
+    console.log('[cv-pdf] Canvas:', canvas.width + '×' + canvas.height);
 
-    if (canvas.width === 0 || canvas.height === 0) {
-      throw new Error('Canvas vacío (0×0). html2canvas no pudo capturar el mount.');
-    }
+    if (!canvas.width || !canvas.height) throw new Error('Canvas vacío (0×0).');
 
-    // 8. Comprobar que el canvas NO es todo blanco (detecta fallo silencioso)
-    const ctx = canvas.getContext('2d');
-    const data = ctx.getImageData(
-      Math.floor(canvas.width / 4),
-      Math.floor(canvas.height / 4),
-      Math.floor(canvas.width / 2),
-      Math.floor(canvas.height / 2)
-    ).data;
-    let nonWhite = 0;
-    for (let i = 0; i < data.length; i += 40) {
-      if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) nonWhite++;
-    }
-    console.log('[cv-pdf] Píxeles no-blancos en muestra:', nonWhite);
-    if (nonWhite === 0) {
-      console.warn('[cv-pdf] ⚠ El canvas parece blanco. Revisa opacity/visibility/overflow.');
-    }
-
-    // 9. Construir el PDF multipágina con jsPDF
+    // ★ PDF con márgenes fijos y troceado por página
     const { jsPDF } = window.jspdf;
-    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
 
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-      compress: true
-    });
+    const pageW = pdf.internal.pageSize.getWidth();   // 210
+    const pageH = pdf.internal.pageSize.getHeight();  // 297
+    const mTop = 15, mBottom = 15, mLeft = 15, mRight = 15;
+    const contentW = pageW - mLeft - mRight;          // 180
+    const contentH = pageH - mTop - mBottom;          // 267
 
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = pdf.internal.pageSize.getHeight();
-    const margin = 8;
-    const contentW = pdfW - 2 * margin;
-    const contentH = pdfH - 2 * margin;
-    const imgH = (canvas.height * contentW) / canvas.width;
+    const pxPerMM = canvas.width / contentW;
+    const pageContentHeightPx = Math.floor(contentH * pxPerMM);
+    const totalPages = Math.ceil(canvas.height / pageContentHeightPx);
+    console.log('[cv-pdf] Páginas a generar:', totalPages);
 
-    let remaining = imgH;
+    for (let i = 0; i < totalPages; i++) {
+      const sourceY = i * pageContentHeightPx;
+      const sourceH = Math.min(pageContentHeightPx, canvas.height - sourceY);
 
-    // Página 1
-    pdf.addImage(imgData, 'JPEG', margin, margin, contentW, imgH);
-    remaining -= contentH;
+      // Trocear el canvas
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sourceH;
+      const ctx = slice.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, slice.width, sourceH);
+      ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
 
-    // Páginas siguientes
-    while (remaining > 0.5) {
-      pdf.addPage();
-      const y = margin - (imgH - remaining);
-      pdf.addImage(imgData, 'JPEG', margin, y, contentW, imgH);
-      remaining -= contentH;
+      const sliceData = slice.toDataURL('image/jpeg', 0.98);
+      const sliceH_MM = (sourceH * contentW) / canvas.width;
+
+      if (i > 0) pdf.addPage();
+      // ★ 'NONE' evita que jsPDF recomprima el JPEG (causa del pixelado)
+      pdf.addImage(sliceData, 'JPEG', mLeft, mTop, contentW, sliceH_MM, undefined, 'NONE');
     }
 
-    console.log('[cv-pdf] Páginas generadas:', pdf.internal.getNumberOfPages());
     pdf.save(`CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`);
-    console.log('[cv-pdf] ✓ PDF guardado');
+    console.log('[cv-pdf] ✓ PDF guardado:', totalPages, 'páginas');
 
   } finally {
     if (toast.parentNode) document.body.removeChild(toast);
     if (mount.parentNode) document.body.removeChild(mount);
   }
+}
+
+   // ==========================================================================
+// CONVERSIÓN DE IMÁGENES A DATA URL (arregla QR y cualquier imagen)
+// ==========================================================================
+async function convertImagesToDataURLs(root) {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  for (const img of imgs) {
+    const src = img.getAttribute('src');
+    if (!src || src.startsWith('data:')) continue;
+    try {
+      const absSrc = new URL(src, document.baseURI).href;
+      const dataURL = await loadImageAsDataURL(absSrc);
+      img.src = dataURL;
+      console.log('[cv-pdf] Imagen convertida a dataURL:', src);
+    } catch (e) {
+      console.warn('[cv-pdf] No se pudo convertir:', src, '→', e.message);
+    }
+  }
+}
+
+function loadImageAsDataURL(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        c.getContext('2d').drawImage(img, 0, 0);
+        resolve(c.toDataURL('image/jpeg', 0.98));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error('No se pudo cargar: ' + src));
+    img.src = src;
+  });
 }
    
   // ==========================================================================
