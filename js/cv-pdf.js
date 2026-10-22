@@ -639,82 +639,119 @@
   // ==========================================================================
   // GENERACIÓN DEL PDF
   // ==========================================================================
-  async function generatePdf(lang, onProgress) {
-    await loadHtml2Pdf();
-    injectStyles();
+  // ==========================================================================
+// GENERACIÓN DEL PDF
+// ==========================================================================
+async function generatePdf(lang, onProgress) {
+  await loadHtml2Pdf();
+  injectStyles();
 
-    // 1. Construir el DOM del CV en memoria
-    const cvRoot = await buildCvRoot(lang, onProgress);
+  // 1. Construir el DOM del CV en memoria
+  const cvRoot = await buildCvRoot(lang, onProgress);
 
-    // 2. Overlay (spinner) — oculta visualmente el contenedor al usuario
-    const overlay = document.createElement('div');
-    overlay.id = 'cv-pdf-overlay';
-    overlay.innerHTML = `
-      <div>
-        <div class="cv-pdf-spinner"></div>
-        <div class="cv-pdf-overlay-text" id="cvpdf-overlay-text">
-          ${lang === 'es' ? 'Generando PDF…' : 'Generating PDF…'}
-        </div>
+  // 2. Overlay con spinner
+  const overlay = document.createElement('div');
+  overlay.id = 'cv-pdf-overlay';
+  overlay.innerHTML = `
+    <div>
+      <div class="cv-pdf-spinner"></div>
+      <div class="cv-pdf-overlay-text" id="cvpdf-overlay-text">
+        ${lang === 'es' ? 'Generando PDF…' : 'Generating PDF…'}
       </div>
-    `;
-    document.body.appendChild(overlay);
+    </div>
+  `;
+  document.body.appendChild(overlay);
 
-    // 3. Contenedor REAL (visible, en el flujo) — bajo el overlay
-    const mount = document.createElement('div');
-    mount.id = 'cv-pdf-mount';
-    mount.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 210mm;
-      background: #ffffff;
-      z-index: 99998;
-      pointer-events: none;
-    `;
-    mount.appendChild(cvRoot);
-    document.body.appendChild(mount);
+  // 3. Guardar estado que vamos a modificar durante la captura
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  const prevBodyOverflow = document.body.style.overflow;
+  const prevBodyOverflowX = document.body.style.overflowX;
 
-    try {
-      // 4. Esperar imágenes + un pequeño margen para layout
-      await waitForImages(cvRoot);
-      await new Promise(r => setTimeout(r, 250));
+  // 4. Mount en el TOP del <body>, posición absolute (NO fixed)
+  const mount = document.createElement('div');
+  mount.id = 'cv-pdf-mount';
+  mount.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 210mm;
+    min-height: 297mm;
+    background: #ffffff;
+    z-index: 1;
+    margin: 0;
+    padding: 0;
+  `;
+  mount.appendChild(cvRoot);
+  document.body.insertBefore(mount, document.body.firstChild);
 
-      // 5. Generar y descargar
-      const opt = {
-        margin: [10, 12, 12, 12],
-        filename: `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: mount.scrollWidth,
-          windowHeight: mount.scrollHeight,
-          logging: false
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait',
-          compress: true
-        },
-        pagebreak: {
-          mode: ['css', 'legacy'],
-          avoid: ['.cv-entry', '.cv-section-title', '.cv-subsection-title', '.cv-header']
-        }
-      };
+  // 5. Neutralizar el overflow de body (causa del recorte)
+  document.body.style.overflow = 'visible';
+  document.body.style.overflowX = 'visible';
 
-      await html2pdf().set(opt).from(mount).save();
-    } finally {
-      // 6. Limpieza SIEMPRE
-      document.body.removeChild(mount);
-      document.body.removeChild(overlay);
+  // 6. Ir al principio del documento (el mount está en top:0 del documento)
+  window.scrollTo(0, 0);
+
+  try {
+    // 7. Esperar layout + imágenes reales
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await waitForImages(cvRoot, 8000);
+    await new Promise(r => setTimeout(r, 400));
+
+    // 8. Diagnóstico (queda en consola; útil si algo vuelve a fallar)
+    const rect = mount.getBoundingClientRect();
+    console.log('[cv-pdf] Mount size:', {
+      width: rect.width,
+      height: rect.height,
+      scrollWidth: mount.scrollWidth,
+      scrollHeight: mount.scrollHeight,
+      children: cvRoot.children.length
+    });
+
+    if (rect.height < 50) {
+      throw new Error(
+        'El contenedor del PDF tiene altura ' + rect.height + 'px. ' +
+        'Probablemente buildCvRoot no generó contenido.'
+      );
     }
-  }
 
+    // 9. Opciones CORREGIDAS de html2canvas
+    const opt = {
+      margin: [10, 12, 12, 12],
+      filename: `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: {
+        scale: 1.5,                // ← antes 2 (evita límite de canvas en CVs largos)
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0
+        // ← ELIMINADOS windowWidth/windowHeight: causaban el "viewport" de 0
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+        compress: true
+      },
+      // ← Simplificado: 'legacy' + 'avoid-all' provocaban saltos erróneos
+      pagebreak: { mode: ['css'] }
+    };
+
+    await html2pdf().set(opt).from(mount).save();
+    console.log('[cv-pdf] PDF generado correctamente.');
+
+  } finally {
+    // 10. Restaurar SIEMPRE el estado original
+    if (mount.parentNode) mount.parentNode.removeChild(mount);
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.body.style.overflow = prevBodyOverflow;
+    document.body.style.overflowX = prevBodyOverflowX;
+    window.scrollTo(scrollX, scrollY);
+  }
+}
   // ==========================================================================
   // UI: PANEL EN EL MENÚ
   // ==========================================================================
