@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, follow">
+  <meta name="author" content="Osmani Tito-Corrioso">
+  <meta name="description" content="Page not found — Osmani Tito-Corrioso's academic homepage.">
+  <title>Page not found — Osmani Tito-Corrioso</title>
+
+  <!-- ===== FAVICONS (mismo set que index.html) ===== -->
+  <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="img/favicon-48x48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="img/android-chrome-192x192.png">
+  <link rel="icon" href="img/favicon.ico" type="image/x-icon">
+  <link rel="manifest" href="img/site.webmanifest">
+
+  <!-- ===== FONTS ===== -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+
+  <!-- ===== STYLES ===== -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Restore language before first paint (evita flash) -->
+  <script>
+    (function () {
+      try {
+        var l = localStorage.getItem('lang') || 'en';
+        document.documentElement.setAttribute('data-lang', l);
+        document.documentElement.setAttribute('lang', l);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ================= HEADER ================= -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">
+      <img src="img/otc.jpg" alt="Osmani Tito-Corrioso">
+      <span class="logo-name">Osmani Tito-Corrioso</span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <button class="nav-toggle" aria-expanded="false" aria-controls="navDropdown">
+        <span class="burger">☰</span>
+        <span class="label">
+          <span lang="en">Menu</span><span lang="es">Menú</span>
+        </span>
+      </button>
+      <ul class="nav-dropdown" id="navDropdown">
+        <li><a href="index.html"><span lang="en">About me</span><span lang="es">Sobre mí</span></a></li>
+        <li><a href="papers.html"><span lang="en">Papers</span><span lang="es">Publicaciones</span></a></li>
+        <li><a href="congress.html"><span lang="en">Congress</span><span lang="es">Congresos</span></a></li>
+        <li><a href="projects.html"><span lang="en">Projects</span><span lang="es">Proyectos</span></a></li>
+        <li><a href="courses.html"><span lang="en">Courses</span><span lang="es">Cursos</span></a></li>
+        <li><a href="education.html"><span lang="en">Education</span><span lang="es">Educación</span></a></li>
+        <li><a href="thesis.html"><span lang="en">Thesis supervised</span><span lang="es">Tesis dirigidas</span></a></li>
+        <li><a href="work.html"><span lang="en">Work</span><span lang="es">Experiencia laboral</span></a></li>
+        <li><a href="awards.html"><span lang="en">Awards</span><span lang="es">Premios</span></a></li>
+        <li><a href="coauthors.html"><span lang="en">Coauthors</span><span lang="es">Coautores</span></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<!-- ================= 404 HERO ================= -->
+<section class="page-header">
+  <div style="max-width: 1200px; margin: 0 auto; text-align: center; position: relative; z-index: 1;">
+    <p style="font-size: .85rem; opacity: .8; letter-spacing: .25em; text-transform: uppercase; margin-bottom: .4rem;">
+      Error 404
+    </p>
+    <h1 style="font-size: clamp(4rem, 12vw, 7rem); line-height: 1; margin: 0; font-family: 'Playfair Display', Georgia, serif;">
+      404
+    </h1>
+    <p style="font-size: 1.15rem; margin-top: 1rem; opacity: .95;">
+      Page not found
+    </p>
+  </div>
+</section>
+
+<!-- ================= 404 CONTENT ================= -->
+<main class="container" style="text-align: center; padding: 3rem 1.5rem 4rem;">
+  <div style="max-width: 640px; margin: 0 auto;">
+    <p style="font-size: 1.15rem; color: var(--text); margin-bottom: 1rem; line-height: 1.6;">
+      The page you are looking for does not exist or has been moved.
+    </p>
+    <p style="font-size: 1rem; color: var(--text-muted); margin-bottom: 2.5rem; line-height: 1.6;">
+      You can go back to the homepage or use the menu above to find what you need.
+    </p>
+
+    <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+      <a href="/" style="
+        display: inline-flex; align-items: center; gap: .5rem;
+        padding: .8rem 1.5rem;
+        background: var(--primary, #1e40af); color: #fff;
+        border-radius: 10px; font-weight: 600; text-decoration: none;
+        box-shadow: 0 4px 14px rgba(30, 64, 175, .3);
+        transition: transform .2s ease, box-shadow .2s ease;
+      ">
+        ← Back to homepage
+      </a>
+      <a href="papers.html" style="
+        display: inline-flex; align-items: center; gap: .5rem;
+        padding: .8rem 1.5rem;
+        background: var(--surface, #fff); color: var(--primary, #1e40af);
+        border: 1px solid var(--border-strong, #cbd5e1);
+        border-radius: 10px; font-weight: 600; text-decoration: none;
+        transition: transform .2s ease, border-color .2s ease;
+      ">
+        📄 Browse papers
+      </a>
+    </div>
+  </div>
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+  <p>© <span id="year"></span> Osmani Tito-Corrioso</p>
+  <div class="visits">
+    <span><span lang="en">Visits:</span><span lang="es">Visitas:</span></span>
+    <script type="text/javascript" src="https://counter.websiteout.net/js/7/0/0/0/"></script>
+    <noscript>
+      <a href="https://www.contadorvisitasgratis.com" title="contador de visitas">
+        <img src="https://counter.websiteout.net/contador/7/0/0/0/" alt="contador de visitas" border="0">
+      </a>
+    </noscript>
+  </div>
+</footer>
+
+<button class="back-to-top" aria-label="Back to top">↑</button>
+<script src="js/main.js"></script>
+<script src="js/whatsapp.js"></script>
+<script src="js/cv-pdf.js"></script>
+<script src="js/enhance.js" defer></script>
+</body>
+</html>
