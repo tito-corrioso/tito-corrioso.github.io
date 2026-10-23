@@ -708,8 +708,6 @@ function fastHtmlToPdfmake(html) {
 
   const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
 
-    const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
-
   console.time('[cv-pdf] createPdf');
   return new Promise((resolve, reject) => {
     let settled = false;
