@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tito-corrioso.github.io/sitemap.xml
