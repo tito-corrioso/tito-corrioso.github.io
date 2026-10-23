@@ -35,9 +35,8 @@ a { color: var(--primary); text-decoration: none; transition: color var(--transi
 a:hover { color: var(--primary-dark); }
 ul { list-style: none; }
 
-/* ---------- Language visibility ---------- */
-[data-lang="en"] [lang="es"],
-[data-lang="es"] [lang="en"] { display: none !important; }
+/* ---------- Language visibility (English only) ---------- */
+[lang="es"] { display: none !important; }
 
 /* ---------- Body ---------- */
 body {
@@ -212,7 +211,7 @@ body {
 
 .hero h1 {
   font-family: var(--font-serif);
-  font-size: clamp(2rem, 4.2vw, 3rem);
+  font-size: clamp(1.75rem, 3.6vw, 2.4rem);
   line-height: 1.1;
   margin-bottom: .5rem;
 }
