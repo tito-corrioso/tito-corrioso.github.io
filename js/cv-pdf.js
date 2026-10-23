@@ -17,7 +17,7 @@
   // ==========================================================================
   const CONFIG = {
     name: 'Osmani Tito-Corrioso',
-    title: 'PhD. in Mathematical Science',
+    title: 'Ph.D. in Mathematical Science',
     cvLabel: 'Curriculum Vitae',
     photo: 'img/otc.jpg',
     qr: 'img/QR.jpg',
