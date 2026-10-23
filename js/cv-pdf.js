@@ -401,7 +401,7 @@
       stack: [
         { text, fontSize: 14, bold: true, color: '#1e3a8a' },
         // Ancho ajustado al nuevo margen de 2cm (170mm content = ~470pt)
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 470, y2: 0, lineWidth: 1.5, lineColor: '#f59e0b' }] }
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 481, y2: 0, lineWidth: 1.5, lineColor: '#f59e0b' }] }
       ],
       margin: [0, 14, 0, 8]
     };
@@ -440,7 +440,7 @@
       stack: [
         { columns, columnGap: 10 },
         // Ancho ajustado al nuevo margen de 2cm
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 470, y2: 0, lineWidth: 2, lineColor: '#1e40af' }], margin: [0, 12, 0, 0] }
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 481, y2: 0, lineWidth: 2, lineColor: '#1e40af' }], margin: [0, 12, 0, 0] }
       ],
       margin: [0, 0, 0, 10]
     };
@@ -793,7 +793,8 @@
     const docDef = {
       pageSize: 'A4',
       // ★ Márgenes 2cm izq/der/arriba, 2.2cm abajo
-      pageMargins: [20, 20, 20, 22],
+      // 20 mm × 72 ÷ 25.4 ≈ 56.7 pt · 22 mm × 72 ÷ 25.4 ≈ 62.4 pt
+      pageMargins: [56.7, 56.7, 56.7, 62.4],
       content,
       defaultStyle: { font: 'Roboto', fontSize: 10, color: '#1e293b' },
 
@@ -805,7 +806,7 @@
             { text: CONFIG.name, alignment: 'left', fontSize: 9, bold: true, color: '#1e40af' },
             { text: (isEs ? 'CURRÍCULUM VÍTAE' : 'CURRICULUM VITAE') + ' · ' + dateStr, alignment: 'right', fontSize: 8, color: '#64748b' }
           ],
-          margin: [20, 10, 20, 0]
+          margin: [56.7, 12, 56.7, 0]
         };
       },
 
@@ -815,7 +816,7 @@
             { text: CONFIG.website, link: CONFIG.website, alignment: 'left', fontSize: 8, color: '#64748b' },
             { text: currentPage + ' / ' + pageCount, alignment: 'right', fontSize: 8, color: '#64748b' }
           ],
-          margin: [20, 0, 20, 12]
+          margin: [56.7, 0, 56.7, 14]
         };
       }
     };
