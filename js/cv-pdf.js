@@ -702,14 +702,14 @@ function fastHtmlToPdfmake(html) {
   };
 
   console.log('[cv-pdf] Bloques en content:', content.length);
-  console.log('[cv-pdf] Tamaño JSON aproximado:', JSON.stringify(content).length, 'chars');
-
+  
   // 6. Avisar al usuario que empieza la generación real
   if (onProgress) onProgress({ phase: 'building', label: isEs ? 'Generando PDF…' : 'Building PDF…' });
 
   const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
 
-  // 7. getBuffer con timeout (más fiable que download())
+    const filename = `CV_Osmani_Tito-Corrioso_${lang.toUpperCase()}.pdf`;
+
   console.time('[cv-pdf] createPdf');
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -718,30 +718,18 @@ function fastHtmlToPdfmake(html) {
       settled = true;
       console.timeEnd('[cv-pdf] createPdf');
       reject(new Error(isEs
-        ? 'La generación del PDF tardó más de 90 s. El documento puede ser demasiado largo. Intenta con menos secciones o usa una conexión más rápida.'
-        : 'PDF generation took more than 90s. The document may be too large. Try with fewer sections or a faster connection.'));
-    }, 90000);
+        ? 'La generación del PDF tardó más de 120 s. Reduce las secciones largas (papers/congress) o usa una conexión más rápida.'
+        : 'PDF generation took more than 120s. Reduce long sections (papers/congress) or use a faster connection.'));
+    }, 120000);
 
     try {
-      const pdf = window.pdfMake.createPdf(docDef);
-      pdf.getBuffer((buffer) => {
+      window.pdfMake.createPdf(docDef).download(filename, () => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         console.timeEnd('[cv-pdf] createPdf');
-        try {
-          const blob = new Blob([buffer], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 1500);
-          console.log('[cv-pdf] ✓ PDF generado:', filename, '·', (blob.size / 1024).toFixed(0), 'KB');
-          resolve();
-        } catch (e) { reject(e); }
+        console.log('[cv-pdf] ✓ PDF generado:', filename);
+        resolve();
       });
     } catch (e) {
       if (settled) return;
