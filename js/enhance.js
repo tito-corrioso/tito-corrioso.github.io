@@ -548,50 +548,60 @@
     });
   }
 
-  function extractCitationData(entry) {
-    const body = entry.querySelector('.entry-body');
-    if (!body) return null;
+  // Reemplaza la función existente 'extractCitationData' por esta:
+function extractCitationData(entry) {
+  const body = entry.querySelector('.entry-body');
+  if (!body) return null;
 
-    const ov = {
-      apa:      entry.getAttribute('data-apa'),
-      vancouver: entry.getAttribute('data-vancouver'),
-      bibtex:   entry.getAttribute('data-bibtex'),
-      doi:      entry.getAttribute('data-doi')
-    };
+  const ov = {
+    apa:      entry.getAttribute('data-apa'),
+    vancouver: entry.getAttribute('data-vancouver'),
+    bibtex:   entry.getAttribute('data-bibtex'),
+    doi:      entry.getAttribute('data-doi')
+  };
 
-    const text = body.textContent.replace(/\s+/g, ' ').trim();
-    const ym = text.match(/\((\d{4})\)/);
-    const year = ym ? ym[1] : '';
-    const authors = ym && ym.index > 0 ? text.slice(0, ym.index).trim().replace(/[,;]\s*$/, '') : '';
+  const text = body.textContent.replace(/\s+/g, ' ').trim();
+  const ym = text.match(/\((\d{4})\)/);
+  const year = ym ? ym[1] : '';
+  const authors = ym && ym.index > 0 ? text.slice(0, ym.index).trim().replace(/[,;]\s*$/, '') : '';
 
-    const em = body.querySelector('em');
-    const title = em ? em.textContent.trim() : '';
+  const em = body.querySelector('em');
+  const title = em ? em.textContent.trim() : '';
 
-    let journal = '';
-    if (em) {
-      let n = em.nextSibling;
-      while (n) {
-        if (n.nodeType === 1 && /^(STRONG|B)$/.test(n.tagName)) {
-          journal = n.textContent.trim();
-          break;
-        }
-        n = n.nextSibling;
+  let journal = '';
+  if (em) {
+    let n = em.nextSibling;
+    while (n) {
+      if (n.nodeType === 1 && /^(STRONG|B)$/.test(n.tagName)) {
+        journal = n.textContent.trim();
+        break;
       }
+      n = n.nextSibling;
     }
-
-    let doi = ov.doi || '';
-    if (!doi) {
-      const a = body.querySelector('a[href*="doi.org"]');
-      if (a) {
-        const m = a.href.match(/doi\.org\/(.+)$/);
-        if (m) doi = m[1];
-      }
-    }
-
-    const issnM = text.match(/ISSN[:\s]*([\dX-]{9})/i);
-
-    return { authors, year, title, journal, doi, issn: issnM ? issnM[1] : '', rawText: text, ov };
   }
+
+  let doi = ov.doi || '';
+  let url = '';
+  // Buscar el DOI en un enlace de doi.org
+  const doiLink = body.querySelector('a[href*="doi.org"]');
+  if (doiLink) {
+    const m = doiLink.href.match(/doi\.org\/(.+)$/);
+    if (m && !doi) doi = m[1];
+    if (m) url = doiLink.href; // La URL del DOI también sirve como URL del artículo
+  }
+  
+  // Si no se encontró un enlace de DOI, usar el primer enlace disponible (ej. "Download PDF")
+  if (!url) {
+    const firstLink = body.querySelector('a[href]');
+    if (firstLink && firstLink.href && !firstLink.href.startsWith('javascript:')) {
+      url = firstLink.href;
+    }
+  }
+
+  const issnM = text.match(/ISSN[:\s]*([\dX-]{9})/i);
+
+  return { authors, year, title, journal, doi, issn: issnM ? issnM[1] : '', rawText: text, url, ov };
+}
 
   function apaAuthors(raw) {
     const pairs = groupAuthorPairs(raw);
@@ -613,49 +623,64 @@
     }).join(', ');
   }
 
-  function formatAPA(d) {
-    if (d.ov.apa) return d.ov.apa;
-    const a = apaAuthors(d.authors) || '[Authors]';
-    const y = d.year || 'n.d.';
-    const t = d.title || '[Title]';
-    const j = d.journal || '[Journal]';
-    const doi = d.doi ? ' https://doi.org/' + d.doi : '';
-    return `${a} (${y}). ${t}. ${j}.${doi}`;
+   // Actualiza 'formatAPA' para incluir la URL si no hay DOI
+function formatAPA(d) {
+  if (d.ov.apa) return d.ov.apa;
+  const a = apaAuthors(d.authors) || '[Authors]';
+  const y = d.year || 'n.d.';
+  const t = d.title || '[Title]';
+  const j = d.journal || '[Journal]';
+  let link = '';
+  if (d.doi) {
+    link = ' https://doi.org/' + d.doi;
+  } else if (d.url) {
+    link = ' ' + d.url;
   }
+  return `${a} (${y}). ${t}. ${j}.${link}`;
+}
 
-  function formatVancouver(d) {
-    if (d.ov.vancouver) return d.ov.vancouver;
-    const a = vancouverAuthors(d.authors) || '[Authors]';
-    const t = d.title || '[Title]';
-    const j = d.journal || '[Journal]';
-    const y = d.year || '[Year]';
-    const doi = d.doi ? ' doi:' + d.doi : '';
-    return `${a}. ${t}. ${j}. ${y}.${doi}`;
+// Actualiza 'formatVancouver' para incluir la URL si no hay DOI
+function formatVancouver(d) {
+  if (d.ov.vancouver) return d.ov.vancouver;
+  const a = vancouverAuthors(d.authors) || '[Authors]';
+  const t = d.title || '[Title]';
+  const j = d.journal || '[Journal]';
+  const y = d.year || '[Year]';
+  let link = '';
+  if (d.doi) {
+    link = ' doi:' + d.doi;
+  } else if (d.url) {
+    link = ' Available from: ' + d.url;
   }
+  return `${a}. ${t}. ${j}. ${y}.${link}`;
+}
 
-  function formatBibtex(d) {
-    if (d.ov.bibtex) return d.ov.bibtex;
-    const firstSur = ((d.authors.split(/[,;]/)[0] || 'ref').trim().toLowerCase().replace(/[^a-z]/g, '')) || 'ref';
-    const firstWord = ((d.title.split(/\s+/)[0] || 'paper').toLowerCase().replace(/[^a-z]/g, '')) || 'paper';
-    const key = firstSur + (d.year || 'xxxx') + firstWord;
-    const isConf = /congress|conference|workshop|compumat|proceedings/i.test(d.journal) || /ISBN/i.test(d.rawText);
-    const type = isConf ? 'inproceedings' : 'article';
-    const field = isConf ? 'booktitle' : 'journal';
+// Actualiza 'formatBibtex' para añadir el campo 'url' si existe
+function formatBibtex(d) {
+  if (d.ov.bibtex) return d.ov.bibtex;
+  const firstSur = ((d.authors.split(/[,;]/)[0] || 'ref').trim().toLowerCase().replace(/[^a-z]/g, '')) || 'ref';
+  const firstWord = ((d.title.split(/\s+/)[0] || 'paper').toLowerCase().replace(/[^a-z]/g, '')) || 'paper';
+  const key = firstSur + (d.year || 'xxxx') + firstWord;
+  const isConf = /congress|conference|workshop|compumat|proceedings/i.test(d.journal) || /ISBN/i.test(d.rawText);
+  const type = isConf ? 'inproceedings' : 'article';
+  const field = isConf ? 'booktitle' : 'journal';
 
-    const authorBib = groupAuthorPairs(d.authors)
-      .map(p => p.initials ? p.surname + ', ' + p.initials.replace(/[.\s]+/g, '. ') : p.surname)
-      .join(' and ');
+  const authorBib = groupAuthorPairs(d.authors)
+    .map(p => p.initials ? p.surname + ', ' + p.initials.replace(/[.\s]+/g, '. ') : p.surname)
+    .join(' and ');
 
-    let bib = `@${type}{${key},\n`;
-    bib += `  author${' '.repeat(6)} = {${authorBib}},\n`;
-    bib += `  year${' '.repeat(8)} = {${d.year}},\n`;
-    bib += `  title${' '.repeat(7)} = {${d.title}},\n`;
-    bib += `  ${field.padEnd(10)} = {${d.journal}}`;
-    if (d.doi)  bib += `,\n  doi${' '.repeat(9)} = {${d.doi}}`;
-    if (d.issn) bib += `,\n  issn${' '.repeat(8)} = {${d.issn}}`;
-    bib += `\n}`;
-    return bib;
-  }
+  let bib = `@${type}{${key},\n`;
+  bib += `  author${' '.repeat(6)} = {${authorBib}},\n`;
+  bib += `  year${' '.repeat(8)} = {${d.year}},\n`;
+  bib += `  title${' '.repeat(7)} = {${d.title}},\n`;
+  bib += `  ${field.padEnd(10)} = {${d.journal}}`;
+  if (d.doi)  bib += `,\n  doi${' '.repeat(9)} = {${d.doi}}`;
+  if (d.issn) bib += `,\n  issn${' '.repeat(8)} = {${d.issn}}`;
+  // Añadir el campo URL si está disponible
+  if (d.url)  bib += `,\n  url${' '.repeat(9)} = {${d.url}}`;
+  bib += `\n}`;
+  return bib;
+}
 
   function openCiteModal(entry) {
     const data = extractCitationData(entry);
