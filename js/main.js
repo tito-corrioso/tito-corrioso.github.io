@@ -4,29 +4,11 @@
 (function () {
   'use strict';
 
-  /* ---------- 1. Language switch ---------- */
-  var root = document.documentElement;
-  var langOpts = document.querySelectorAll('.lang-opt');
-
-  function applyLang(lang) {
-    root.setAttribute('data-lang', lang);
-    root.setAttribute('lang', lang);
-    try { localStorage.setItem('lang', lang); } catch (e) {}
-    langOpts.forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.lang === lang);
-    });
-  }
-
-  // Restore persisted language (also done in <head> to prevent flash)
-  var saved = 'en';
-  try { saved = localStorage.getItem('lang') || 'en'; } catch (e) {}
-  applyLang(saved);
-
-  langOpts.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      applyLang(btn.dataset.lang);
-    });
-  });
+/* ---------- 1. Language (fixed to English) ---------- */
+var root = document.documentElement;
+root.setAttribute('data-lang', 'en');
+root.setAttribute('lang', 'en');
+try { localStorage.removeItem('lang'); } catch (e) {}
 
   /* ---------- 2. Dropdown menu ---------- */
   var navToggle = document.querySelector('.nav-toggle');
