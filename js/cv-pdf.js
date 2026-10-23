@@ -65,30 +65,23 @@
   }
 
   async function loadPdfLibraries() {
-  const tasks = [];
-
-  // 1. Cargar pdfmake (versión 0.3, la recomendada oficialmente)
+  // 1) pdfmake primero
   if (!window.pdfMake || typeof window.pdfMake.createPdf !== 'function') {
-    tasks.push(loadScript('https://unpkg.com/pdfmake@0.3/build/pdfmake.min.js'));
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js');
   }
-
-  // 2. Cargar vfs_fonts (fuentes) SOLO después de pdfmake
-  //    Es crucial para que createPdf esté disponible
+  // 2) vfs_fonts después, en secuencia
   if (!window.pdfMake || !window.pdfMake.vfs) {
-    tasks.push(loadScript('https://unpkg.com/pdfmake@0.3/build/vfs_fonts.js'));
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js');
   }
-
-  await Promise.all(tasks);
-
-  // Verificación final
-  if (!window.pdfMake) {
-    throw new Error('pdfmake no se cargó correctamente desde el CDN');
+  // 3) Verificación
+  if (!window.pdfMake || typeof window.pdfMake.createPdf !== 'function') {
+    throw new Error('pdfmake no se cargó correctamente');
   }
-  if (typeof window.pdfMake.createPdf !== 'function') {
-    throw new Error('pdfMake.createPdf no está disponible. Revisa que vfs_fonts.js se haya cargado.');
+  if (!window.pdfMake.vfs) {
+    throw new Error('vfs_fonts.js no se cargó correctamente');
   }
 }
-
+   
   // ==========================================================================
   // TRADUCCIÓN (MyMemory, gratuita, sin key)
   // ==========================================================================
