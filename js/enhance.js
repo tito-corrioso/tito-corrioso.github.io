@@ -22,6 +22,7 @@
     stickyYears:     true,   // G
     scrollSpy:       true,   // H
     toasts:          true,   // L
+    compactLayout:        true,
     academicBadges:       true,   // Badges ORCID + Google Scholar en el hero
     citationBulkDownload: true    // Descarga masiva en papers.html
   };
@@ -1066,13 +1067,13 @@ function formatBibtex(d) {
       <div class="nx-citation-download">
         <span class="nx-citation-label">Download all citations:</span>
         <button type="button" class="nx-cite-dl-btn" data-format="apa">
-          APA
+          APA (.txt)
         </button>
         <button type="button" class="nx-cite-dl-btn" data-format="vancouver">
-          Vancouver
+          Vancouver (.txt)
         </button>
         <button type="button" class="nx-cite-dl-btn nx-cite-dl-bibtex" data-format="bibtex">
-          BibTeX
+          BibTeX (.bib)
         </button>
       </div>
     `);
@@ -1145,6 +1146,81 @@ function formatBibtex(d) {
     }
   }
 
+    // ============================================================
+  // COMPACT LAYOUT — reduce la altura de papers.html y congress.html
+  // ============================================================
+  function initCompactLayout() {
+    if (!LIST_PAGES.includes(currentPage())) return;
+
+    document.body.classList.add('nx-compact-header');
+
+    if (document.getElementById('nx-compact-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'nx-compact-styles';
+    s.textContent = `
+      /* ---- Page-header más bajo ---- */
+      .nx-compact-header .page-header {
+        padding: 1.5rem 1.5rem 1rem;
+      }
+      .nx-compact-header .page-header h1 {
+        font-size: clamp(1.5rem, 2.8vw, 1.9rem);
+        margin-bottom: .1rem;
+      }
+      .nx-compact-header .page-header p {
+        font-size: .85rem;
+      }
+      .nx-compact-header .page-header::before {
+        font-size: 7rem;
+        letter-spacing: 1rem;
+      }
+
+      /* ---- Barra de descarga de citas más pequeña ---- */
+      .nx-compact-header .nx-citation-download {
+        padding: .5rem .8rem;
+        margin-bottom: .65rem;
+        gap: .4rem;
+      }
+      .nx-compact-header .nx-citation-label {
+        font-size: .78rem;
+      }
+      .nx-compact-header .nx-cite-dl-btn {
+        padding: .35rem .7rem;
+        font-size: .75rem;
+      }
+
+      /* ---- Toolbar de búsqueda más compacta ---- */
+      .nx-compact-header .nx-papers-toolbar {
+        padding: .6rem .8rem;
+        margin-bottom: .85rem;
+        gap: .4rem;
+      }
+      .nx-compact-header .nx-search,
+      .nx-compact-header .nx-year-filter {
+        padding: .45rem .7rem;
+        font-size: .82rem;
+      }
+
+      /* ---- Menos espacio arriba del main ---- */
+      .nx-compact-header main.container {
+        padding-top: 1rem;
+      }
+
+      /* ---- Ajustes en móvil ---- */
+      @media (max-width: 640px) {
+        .nx-compact-header .page-header {
+          padding: 1rem 1rem .85rem;
+        }
+        .nx-compact-header .page-header h1 {
+          font-size: 1.4rem;
+        }
+        .nx-compact-header .page-header p {
+          font-size: .78rem;
+        }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+   
   // ============================================================
   // INIT
   // ============================================================
@@ -1160,6 +1236,7 @@ function formatBibtex(d) {
     if (FEATURES.scrollSpy)       try { initScrollSpy(); }       catch (e) { console.warn('[nx] spy:', e); }
     if (FEATURES.academicBadges) try { initAcademicBadges(); } catch (e) { console.warn('[nx] badges:', e); }
     if (FEATURES.citationBulkDownload) try { initCitationBulkDownload(); } catch (e) { console.warn('[nx] bulk cite:', e); }
+    if (FEATURES.compactLayout) try { initCompactLayout(); } catch (e) { console.warn('[nx] compact:', e); }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
