@@ -904,6 +904,245 @@ function formatBibtex(d) {
     }
   }
 
+    // ============================================================
+  // ESTILOS EXTRA (solo se inyectan si alguna feature los usa)
+  // ============================================================
+  function ensureExtraStyles() {
+    if (document.getElementById('nx-extra-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'nx-extra-styles';
+    s.textContent = `
+      /* ----- Academic badges (hero) ----- */
+      .nx-academic-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .55rem;
+        margin-top: 1rem;
+      }
+      .nx-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .42rem .85rem;
+        background: rgba(255,255,255,.15);
+        border: 1px solid rgba(255,255,255,.4);
+        color: #fff;
+        border-radius: 999px;
+        font-size: .82rem;
+        font-weight: 600;
+        text-decoration: none;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: all .2s ease;
+      }
+      .nx-badge:hover {
+        background: rgba(255,255,255,.3);
+        transform: translateY(-2px);
+        color: #fff;
+      }
+      .nx-badge svg { width: 16px; height: 16px; flex-shrink: 0; }
+      .nx-badge-orcid   { border-color: rgba(166, 206, 57, .7); }
+      .nx-badge-orcid:hover   { background: rgba(166, 206, 57, .35); }
+      .nx-badge-scholar { border-color: rgba(66, 133, 244, .7); }
+      .nx-badge-scholar:hover { background: rgba(66, 133, 244, .35); }
+
+      /* ----- Bulk citation download ----- */
+      .nx-citation-download {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .6rem;
+        padding: .9rem 1.1rem;
+        margin-bottom: 1.25rem;
+        background: var(--surface, #fff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: var(--radius, 12px);
+      }
+      .nx-citation-label {
+        font-size: .88rem;
+        font-weight: 600;
+        color: var(--text-muted, #64748b);
+        margin-right: .3rem;
+      }
+      .nx-cite-dl-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .5rem .95rem;
+        background: var(--primary, #1e40af);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: .82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s ease;
+      }
+      .nx-cite-dl-btn:hover {
+        background: var(--primary-dark, #1e3a8a);
+        transform: translateY(-1px);
+      }
+      .nx-cite-dl-btn:disabled { opacity: .6; cursor: wait; }
+      .nx-cite-dl-bibtex { background: #475569; }
+      .nx-cite-dl-bibtex:hover { background: #334155; }
+
+      [data-theme="dark"] .nx-citation-download {
+        background: var(--surface);
+        border-color: var(--border);
+      }
+      [data-theme="dark"] .nx-badge {
+        background: rgba(255,255,255,.08);
+        border-color: rgba(255,255,255,.25);
+      }
+
+      @media print {
+        .nx-academic-badges, .nx-citation-download { display: none !important; }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  // ============================================================
+  // ACADEMIC BADGES (hero — ORCID + Google Scholar)
+  // ============================================================
+  function initAcademicBadges() {
+    const hero = document.querySelector('.hero-inner');
+    if (!hero || hero.querySelector('.nx-academic-badges')) return;
+    const textCol = hero.lastElementChild;
+    if (!textCol) return;
+
+    ensureExtraStyles();
+
+    const orcidIcon = `
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zM7.369 4.378c.525 0 .947.431.947.947s-.422.947-.947.947a.95.95 0 0 1-.947-.947c0-.525.422-.947.947-.947zm-.722 3.038h1.444v10.041H6.647V7.416zm3.562 0h3.9c3.712 0 5.344 2.653 5.344 5.025 0 2.578-2.016 5.025-5.325 5.025h-3.919V7.416zm1.444 1.303v7.444h2.297c3.272 0 4.022-2.484 4.022-3.722 0-2.016-1.284-3.722-4.097-3.722h-2.222z"/>
+      </svg>`;
+
+    const scholarIcon = `
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
+      </svg>`;
+
+    const badges = createEl(`
+      <div class="nx-academic-badges">
+        <a class="nx-badge nx-badge-orcid"
+           href="https://orcid.org/0000-0003-4231-7674"
+           target="_blank" rel="noopener noreferrer"
+           title="ORCID iD: 0000-0003-4231-7674">
+          ${orcidIcon}
+          <span>ORCID</span>
+        </a>
+        <a class="nx-badge nx-badge-scholar"
+           href="https://scholar.google.com/citations?user=bXhoJuYAAAAJ"
+           target="_blank" rel="noopener noreferrer"
+           title="Google Scholar profile">
+          ${scholarIcon}
+          <span>Google Scholar</span>
+        </a>
+      </div>
+    `);
+
+    // Insertar antes del bloque de acciones (Download CV) si existe,
+    // para que los badges queden arriba y el botón abajo.
+    const actions = textCol.querySelector('.nx-hero-actions');
+    if (actions) textCol.insertBefore(badges, actions);
+    else textCol.appendChild(badges);
+  }
+
+  // ============================================================
+  // BULK CITATION DOWNLOAD (papers.html)
+  // ============================================================
+  function initCitationBulkDownload() {
+    if (currentPage() !== 'papers.html') return;
+    const list = document.querySelector('main.container .entry-list');
+    if (!list) return;
+    if (list.parentNode.querySelector('.nx-citation-download')) return;
+
+    ensureExtraStyles();
+
+    const toolbar = createEl(`
+      <div class="nx-citation-download">
+        <span class="nx-citation-label">Download all citations:</span>
+        <button type="button" class="nx-cite-dl-btn" data-format="apa">
+          APA 7th (.txt)
+        </button>
+        <button type="button" class="nx-cite-dl-btn" data-format="vancouver">
+          Vancouver (.txt)
+        </button>
+        <button type="button" class="nx-cite-dl-btn nx-cite-dl-bibtex" data-format="bibtex">
+          BibTeX (.bib)
+        </button>
+      </div>
+    `);
+    list.parentNode.insertBefore(toolbar, list);
+
+    toolbar.querySelectorAll('.nx-cite-dl-btn').forEach(btn => {
+      btn.addEventListener('click', () => downloadAllCitations(btn));
+    });
+  }
+
+  function downloadAllCitations(btn) {
+    const format = btn.dataset.format;
+    const originalLabel = btn.textContent.trim();
+    btn.disabled = true;
+    btn.textContent = 'Preparing…';
+
+    try {
+      const entries = [...document.querySelectorAll('.entry')];
+      const parts = [];
+      let ok = 0;
+
+      entries.forEach((entry, i) => {
+        const data = extractCitationData(entry);
+        if (!data) return;
+
+        let text = '';
+        if (format === 'apa')            text = formatAPA(data);
+        else if (format === 'vancouver') text = formatVancouver(data);
+        else if (format === 'bibtex')    text = formatBibtex(data);
+
+        if (!text || !text.trim()) return;
+        ok++;
+
+        if (format === 'vancouver')      parts.push(`${ok}. ${text}`);
+        else                             parts.push(text);
+      });
+
+      if (!ok) {
+        toast('No citations could be generated.');
+        return;
+      }
+
+      const content = parts.join('\n\n');
+      const isBib = format === 'bibtex';
+      const mime = isBib ? 'application/x-bibtex' : 'text/plain';
+      const ext = isBib ? 'bib' : 'txt';
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = `tito-corrioso-citations-${format}-${date}.${ext}`;
+
+      const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      const fmtLabel = format === 'apa' ? 'APA 7th'
+                     : format === 'vancouver' ? 'Vancouver'
+                     : 'BibTeX';
+      toast(`Downloaded ${ok} citations as ${fmtLabel} (.${ext})`);
+    } catch (e) {
+      console.warn('[nx] bulk cite:', e);
+      toast('Could not generate the citation file.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
   // ============================================================
   // INIT
   // ============================================================
@@ -917,6 +1156,8 @@ function formatBibtex(d) {
     if (FEATURES.stickyYears)     try { initStickyYears(); }     catch (e) { console.warn('[nx] sticky:', e); }
     if (FEATURES.paperSearch)     try { initPaperSearch(); }     catch (e) { console.warn('[nx] search:', e); }
     if (FEATURES.scrollSpy)       try { initScrollSpy(); }       catch (e) { console.warn('[nx] spy:', e); }
+    if (FEATURES.academicBadges) try { initAcademicBadges(); } catch (e) { console.warn('[nx] badges:', e); }
+    if (FEATURES.citationBulkDownload) try { initCitationBulkDownload(); } catch (e) { console.warn('[nx] bulk cite:', e); }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
