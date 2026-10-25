@@ -1066,13 +1066,13 @@ function formatBibtex(d) {
       <div class="nx-citation-download">
         <span class="nx-citation-label">Download all citations:</span>
         <button type="button" class="nx-cite-dl-btn" data-format="apa">
-          APA 7th (.txt)
+          APA
         </button>
         <button type="button" class="nx-cite-dl-btn" data-format="vancouver">
-          Vancouver (.txt)
+          Vancouver
         </button>
         <button type="button" class="nx-cite-dl-btn nx-cite-dl-bibtex" data-format="bibtex">
-          BibTeX (.bib)
+          BibTeX
         </button>
       </div>
     `);
