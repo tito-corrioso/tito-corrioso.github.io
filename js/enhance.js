@@ -21,7 +21,9 @@
     paperSearch:     true,   // F
     stickyYears:     true,   // G
     scrollSpy:       true,   // H
-    toasts:          true    // L
+    toasts:          true,   // L
+    academicBadges:       true,   // Badges ORCID + Google Scholar en el hero
+    citationBulkDownload: true    // Descarga masiva en papers.html
   };
 
   // Páginas que activan buscador y cabeceras sticky (edítalo si añades más)
