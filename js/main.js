@@ -98,4 +98,19 @@ if ('IntersectionObserver' in window && revealEls.length) {
   /* ---------- 5. Footer year ---------- */
   var yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+    /* ---------- 6. Menu uppercase ---------- */
+  function initMenuUppercase() {
+    if (document.getElementById('nx-menu-uppercase')) return;
+    var style = document.createElement('style');
+    style.id = 'nx-menu-uppercase';
+    style.textContent = [
+      '.nav-dropdown > li:not(#cv-pdf-li) > a {',
+      '  text-transform: uppercase;',
+      '  letter-spacing: 0.04em;',
+      '}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+  initMenuUppercase();
 })();
