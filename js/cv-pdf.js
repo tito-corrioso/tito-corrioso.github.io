@@ -266,33 +266,33 @@
     return fetchDoc('index.html');
   }
 
-  function getSectionGroup(entryEl) {
-    let el = entryEl;
-    while (el) {
-      if (el.classList && el.classList.contains('section')) break;
-      el = el.parentElement;
-    }
-    if (el) {
-      const h = el.querySelector('.section-title');
-      if (h) return h.textContent.trim();
-    }
-    return null;
+  function getSectionGroup(entryEl, lang) {
+  let el = entryEl;
+  while (el) {
+    if (el.classList && el.classList.contains('section')) break;
+    el = el.parentElement;
   }
+  if (el) {
+    const h = el.querySelector('.section-title');
+    if (h) return pickLang(h, lang || 'en');
+  }
+  return null;
+}
 
-  function parseEntries(doc) {
-    const entries = [];
-    doc.querySelectorAll('.entry').forEach(entryEl => {
-      const yearEl = entryEl.querySelector('.entry-year');
-      const bodyEl = entryEl.querySelector('.entry-body');
-      if (!bodyEl) return;
-      entries.push({
-        year: yearEl ? yearEl.textContent.trim() : '',
-        html: bodyEl.innerHTML.trim(),
-        sectionGroup: getSectionGroup(entryEl)
-      });
+  function parseEntries(doc, lang) {
+  const entries = [];
+  doc.querySelectorAll('.entry').forEach(entryEl => {
+    const yearEl = entryEl.querySelector('.entry-year');
+    const bodyEl = entryEl.querySelector('.entry-body');
+    if (!bodyEl) return;
+    entries.push({
+      year: yearEl ? yearEl.textContent.trim() : '',
+      html: bodyEl.innerHTML.trim(),
+      sectionGroup: getSectionGroup(entryEl, lang)
     });
-    return entries;
-  }
+  });
+  return entries;
+}
 
   // ==========================================================================
   // RESOLUCIÓN DE RUTAS
@@ -755,7 +755,7 @@
       }
       console.timeEnd('[cv-pdf] ' + s.key + ' fetch');
 
-      const entries = parseEntries(doc);
+      const entries = parseEntries(doc, lang);
       if (!entries.length) continue;
 
       console.time('[cv-pdf] ' + s.key + ' translate+build');
